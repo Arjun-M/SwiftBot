@@ -36,6 +36,10 @@ SwiftBot is a blazing-fast Telegram bot framework built for performance and deve
 
 ```bash
 pip install swiftbot
+
+[OR]
+
+pip install git+https://github.com/Arjun-M/SwiftBot.git
 ```
 
 ### Optional Dependencies
