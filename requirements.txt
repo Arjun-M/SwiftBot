@@ -1,0 +1,9 @@
+# Core dependencies
+httpx>=0.24.0
+httpx[http2]>=0.24.0
+
+# Optional dependencies (install based on needs)
+# redis>=4.0.0  # For Redis storage
+# asyncpg>=0.27.0  # For PostgreSQL storage
+# motor>=3.0.0  # For MongoDB storage
+# uvicorn>=0.23.0  # For webhook server
