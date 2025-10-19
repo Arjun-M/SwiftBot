@@ -388,41 +388,6 @@ class SwiftBot:
             await self.connection_pool.close()
             print("Bot stopped")
 
-    async def dispatch(self, update_data: dict):
-        """
-        Dispatch a single update manually — ideal for use with custom webhook servers.
-
-        Example:
-            from fastapi import FastAPI, Request
-
-            app = FastAPI()
-            bot = SwiftBot(token="YOUR_TOKEN")
-
-            @app.post("/webhook")
-            async def webhook(request: Request):
-                update = await request.json()
-                await bot.dispatch(update)
-                return {"ok": True}
-
-        Args:
-            update_data (dict): The raw JSON update body received from Telegram.
-        """
-        try:
-            # Ensure bot is initialized
-            if not self.running:
-                # Start worker pool if not running (light mode)
-                self.running = True
-                await self.worker_pool.start()
-
-            # Parse update using TelegramAPI or types
-            update = await self.api.parse_update(update_data)
-
-            # Submit to worker pool for async processing
-            await self.worker_pool.submit(self._process_update, update)
-
-        except Exception as e:
-            print(f"[SwiftBot] Failed to dispatch update: {e}")
-
     async def run(
         self,
         mode: str = "polling",
