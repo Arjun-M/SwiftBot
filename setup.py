@@ -12,7 +12,9 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
 setup(
-    name="SwiftBot",
+    name="swiftbot",
+    packages=find_packages(where='SwiftBot'),
+    package_dir={'': 'SwiftBot'},
     version="1.0.0",
     author="Arjun-M",
     author_email="",
@@ -20,7 +22,6 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/Arjun-M/SwiftBot",
-    packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
