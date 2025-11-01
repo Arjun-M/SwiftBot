@@ -8,5 +8,6 @@ from .logger import Logger
 from .rate_limiter import RateLimiter
 from .auth import Auth
 from .user_data import UserDataMiddleware
+from .analytics import AnalyticsCollector
 
-__all__ = ["Middleware", "Logger", "RateLimiter", "Auth", "UserDataMiddleware"]
+__all__ = ["Middleware", "Logger", "RateLimiter", "Auth", "UserDataMiddleware" , "AnalyticsCollector"]
