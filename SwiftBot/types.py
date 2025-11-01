@@ -1,10 +1,10 @@
 """
-Telegram event types for decorators
+Telegram event types for decorators with integrated filtering
 Copyright (c) 2025 Arjun-M/SwiftBot
 """
 
 import re
-from typing import Union, List, Callable, Optional, Pattern
+from typing import Union, List, Callable, Optional, Pattern, Any
 from dataclasses import dataclass
 
 
@@ -19,7 +19,7 @@ class User:
     language_code: Optional[str] = None
 
 
-@dataclass
+@dataclass  
 class Chat:
     """Telegram chat object"""
     id: int
@@ -34,6 +34,7 @@ class EventType:
     """
     Base class for all event types used in decorators.
     Provides pattern matching and filtering capabilities.
+    Now properly integrated with the filter system.
 
     Copyright (c) 2025 Arjun-M/SwiftBot
     """
@@ -45,6 +46,7 @@ class EventType:
         func: Optional[Callable] = None,
         incoming: bool = True,
         outgoing: bool = False,
+        filter_func: Optional[Callable] = None,
         **kwargs
     ):
         """
@@ -53,14 +55,16 @@ class EventType:
         Args:
             text: Exact text to match
             pattern: Regex pattern(s) to match
-            func: Custom filter function
+            func: Custom filter function (legacy)
+            filter_func: New unified filter function
             incoming: Match incoming messages
             outgoing: Match outgoing messages
             **kwargs: Additional filters (chat_id, user_id, etc.)
         """
         self.text = text
         self.patterns = self._compile_patterns(pattern)
-        self.func = func
+        self.func = func  # Legacy support
+        self.filter_func = filter_func  # New unified filter
         self.incoming = incoming
         self.outgoing = outgoing
         self.filters = kwargs
@@ -81,39 +85,77 @@ class EventType:
                 compiled.append(p)
         return compiled
 
-    def matches(self, update) -> Optional[re.Match]:
+    def matches(self, update_obj: Any) -> Optional[re.Match]:
         """
         Check if update matches this event type.
         Returns regex match object if applicable.
+
+        Args:
+            update_obj: The specific update object (Message, CallbackQuery, etc.)
         """
+        # Apply unified filter first (from Filters system)
+        if self.filter_func and not self.filter_func(update_obj):
+            return None
+
         # Text exact match
-        if self.text and hasattr(update, 'text'):
-            if update.text != self.text:
+        if self.text:
+            obj_text = None
+            if hasattr(update_obj, 'text'):
+                obj_text = update_obj.text
+            elif hasattr(update_obj, 'data'):  # CallbackQuery
+                obj_text = update_obj.data
+            elif hasattr(update_obj, 'query'):  # InlineQuery
+                obj_text = update_obj.query
+
+            if obj_text != self.text:
                 return None
 
         # Pattern matching
-        if self.patterns and hasattr(update, 'text') and update.text:
-            for pattern in self.patterns:
-                match = pattern.match(update.text)
-                if match:
-                    return match
-            if self.text is None:  # If patterns exist but none match
+        if self.patterns:
+            obj_text = None
+            if hasattr(update_obj, 'text'):
+                obj_text = update_obj.text
+            elif hasattr(update_obj, 'data'):  # CallbackQuery
+                obj_text = update_obj.data  
+            elif hasattr(update_obj, 'query'):  # InlineQuery
+                obj_text = update_obj.query
+
+            if obj_text:
+                for pattern in self.patterns:
+                    match = pattern.search(obj_text)  # Use search instead of match for flexibility
+                    if match:
+                        return match
+
+            # If patterns exist but none match and no text filter
+            if self.text is None:
                 return None
 
-        # Custom filter function
-        if self.func and not self.func(update):
+        # Legacy custom filter function
+        if self.func and not self.func(update_obj):
             return None
 
-        # Additional filters
+        # Additional filters (more robust checking)
         for key, value in self.filters.items():
-            if not hasattr(update, key):
-                return None
+            obj_value = None
 
-            update_value = getattr(update, key)
-            if isinstance(value, list):
-                if update_value not in value:
+            # Handle nested attributes like chat.type
+            if '.' in key:
+                obj = update_obj
+                for attr in key.split('.'):
+                    if hasattr(obj, attr):
+                        obj = getattr(obj, attr)
+                    else:
+                        return None
+                obj_value = obj
+            else:
+                if not hasattr(update_obj, key):
                     return None
-            elif update_value != value:
+                obj_value = getattr(update_obj, key)
+
+            if isinstance(value, list):
+                if obj_value not in value:
+                    return None
+            elif obj_value != value:
                 return None
 
         return True  # Matches
@@ -127,11 +169,14 @@ class Message(EventType):
     Example:
         @client.on(Message(text="hello"))
         @client.on(Message(pattern=r"^/start"))
-        @client.on(Message(func=lambda m: len(m.text) > 10))
+        @client.on(Message(func=lambda m: len(m.text or '') > 10))
 
     Copyright (c) 2025 Arjun-M/SwiftBot
     """
-    pass
+
+    def __init__(self, filter_func=None, **kwargs):
+        """Initialize Message event type with optional filter"""
+        super().__init__(filter_func=filter_func, **kwargs)
 
 
 class EditedMessage(EventType):
