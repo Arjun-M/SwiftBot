@@ -14,6 +14,7 @@ __license__ = "MIT"
 from .client import SwiftBot
 from .context import Context
 from .types import Message, CallbackQuery, InlineQuery, EditedMessage, ChatMemberUpdated, EventType
+from .exceptions import SwiftBotException, SwiftBotError, ConfigurationError
 from .filters import Filters
 from .update_types import Update
 
