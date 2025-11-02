@@ -3,8 +3,8 @@ SwiftBot - Main client class
 Copyright (c) 2025 Arjun-M/SwiftBot
 """
 
+
 import asyncio
-import logging
 from typing import Optional, Dict, List, Callable, Any
 from .router import CommandRouter
 from .context import Context
@@ -13,14 +13,18 @@ from .connection.worker import WorkerPool
 from .api.telegram import TelegramAPI
 from .types import EventType
 from .update_types import Update
+from .exceptions import SwiftBotException, SwiftBotError, ConfigurationError
+from .exceptions.handlers import CentralizedExceptionHandler
 
-# Set up logger
-logger = logging.getLogger(__name__)
+# Remove excessive logging - let middleware handle it
+import logging
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("http.client").setLevel(logging.WARNING)
 
 
 class SwiftBot:
     """
-    SwiftBot - Ultra-fast Telegram bot framework.
+    SwiftBot - Ultra-fast Telegram bot framework with enhanced error handling.
 
     Features:
     - 30× faster command routing with Trie data structure
@@ -30,6 +34,8 @@ class SwiftBot:
     - Enterprise-grade middleware system
     - Multiple storage backends (Redis, PostgreSQL, MongoDB, File)
     - Broadcast system with progress tracking
+    - Centralized exception handling
+    - Optimized logging through middleware
 
     Example:
         client = SwiftBot(token="YOUR_TOKEN", worker_pool_size=50)
@@ -40,7 +46,7 @@ class SwiftBot:
 
         await client.run()
 
-    Copyright (c) 2025 Arjun-M/SwiftBot
+    Copyright (c) 2025 Arjun-M/SwiftBot 
     """
 
     def __init__(
@@ -57,6 +63,7 @@ class SwiftBot:
         retry_config: Optional[Dict] = None,
         rate_limiter: Optional[Dict] = None,
         debug: bool = False,
+        enable_centralized_exceptions: bool = True,
     ):
         """
         Initialize SwiftBot client.
@@ -73,41 +80,55 @@ class SwiftBot:
             connection_pool: Advanced connection pool config
             retry_config: Retry configuration
             rate_limiter: Rate limiter configuration
-            debug: Enable debug logging
+            debug: Enable debug mode (handled by middleware)
+            enable_centralized_exceptions: Enable centralized exception handling
         """
-        self.token = token
+        # Validate token
+        if not token or not isinstance(token, str):
+            raise ConfigurationError("Bot token is required and must be a string")
+
+        if not token.strip():
+            raise ConfigurationError("Bot token cannot be empty")
+
+        self.token = token.strip()
         self.parse_mode = parse_mode
         self.async_mode = async_mode
         self.api_base_url = api_base_url
         self.debug = debug
 
-        # Set up logging
-        if debug:
-            logging.basicConfig(level=logging.DEBUG)
-        else:
-            logging.basicConfig(level=logging.INFO)
+        # Initialize centralized exception handler
+        self.exception_handler = CentralizedExceptionHandler() if enable_centralized_exceptions else None
 
-        # Initialize connection pool
+        # Initialize connection pool with validation
         pool_config = connection_pool or {}
-        self.connection_pool = HTTPConnectionPool(
-            max_connections=pool_config.get('max_connections', max_connections),
-            max_keepalive_connections=pool_config.get('max_keepalive_connections', 50),
-            keepalive_expiry=pool_config.get('keepalive_expiry', 30.0),
-            timeout=timeout,
-            enable_http2=enable_http2,
-            max_retries=retry_config.get('max_retries', 3) if retry_config else 3,
-            backoff_factor=retry_config.get('backoff_factor', 0.5) if retry_config else 0.5,
-        )
+        try:
+            self.connection_pool = HTTPConnectionPool(
+                max_connections=pool_config.get('max_connections', max_connections),
+                max_keepalive_connections=pool_config.get('max_keepalive_connections', 50),
+                keepalive_expiry=pool_config.get('keepalive_expiry', 30.0),
+                timeout=timeout,
+                enable_http2=enable_http2,
+                max_retries=retry_config.get('max_retries', 3) if retry_config else 3,
+                backoff_factor=retry_config.get('backoff_factor', 0.5) if retry_config else 0.5,
+            )
+        except Exception as e:
+            raise ConfigurationError(f"Failed to initialize connection pool: {e}")
 
-        # Initialize worker pool
-        self.worker_pool = WorkerPool(
-            num_workers=worker_pool_size,
-            max_queue_size=1000,
-            enable_dead_letter=True
-        )
+        # Initialize worker pool with validation
+        try:
+            self.worker_pool = WorkerPool(
+                num_workers=worker_pool_size,
+                max_queue_size=1000,
+                enable_dead_letter=True
+            )
+        except Exception as e:
+            raise ConfigurationError(f"Failed to initialize worker pool: {e}")
 
         # Initialize Telegram API
-        self.api = TelegramAPI(token, self.connection_pool, api_base_url)
+        try:
+            self.api = TelegramAPI(token, self.connection_pool, api_base_url)
+        except Exception as e:
+            raise ConfigurationError(f"Failed to initialize Telegram API: {e}")
 
         # Initialize router
         self.router = CommandRouter()
@@ -119,15 +140,18 @@ class SwiftBot:
         self.running = False
         self._update_offset = 0
 
-        # Bot info cache
+        # Bot info cache with TTL
         self._bot_info = None
+        self._bot_info_expires = 0
 
         # Statistics
         self._stats = {
             'updates_processed': 0,
             'errors_handled': 0,
             'handlers_executed': 0,
-            'start_time': None
+            'start_time': None,
+            'exceptions_by_type': {},
+            'performance_metrics': {}
         }
 
     def on(self, event_type: EventType, priority: int = 0):
@@ -149,11 +173,11 @@ class SwiftBot:
         def decorator(func: Callable):
             try:
                 self.router.add_handler(event_type, func, priority)
-                logger.debug(f"Registered handler {func.__name__} with priority {priority}")
                 return func
             except Exception as e:
-                logger.error(f"Error registering handler {func.__name__}: {e}")
-                raise
+                if self.exception_handler:
+                    self.exception_handler.handle_exception(e, context="handler_registration")
+                raise SwiftBotError(f"Error registering handler {func.__name__}: {e}")
 
         return decorator
 
@@ -168,24 +192,50 @@ class SwiftBot:
         Args:
             middleware: Middleware instance
         """
-        self.middleware.append(middleware)
-        logger.info(f"Registered middleware: {type(middleware).__name__}")
+        try:
+            self.middleware.append(middleware)
+        except Exception as e:
+            if self.exception_handler:
+                self.exception_handler.handle_exception(e, context="middleware_registration")
+            raise SwiftBotError(f"Error registering middleware: {e}")
 
-    async def get_me(self):
+    async def get_me(self, use_cache: bool = True):
         """
-        Get bot information.
+        Get bot information with caching.
+
+        Args:
+            use_cache: Whether to use cached bot info
 
         Returns:
             Bot user object
         """
-        if not self._bot_info:
+        current_time = asyncio.get_event_loop().time()
+
+        if use_cache and self._bot_info and current_time < self._bot_info_expires:
+            return self._bot_info
+
+        try:
             self._bot_info = await self.api.get_me()
-        return self._bot_info
+            self._bot_info_expires = current_time + 300  # Cache for 5 minutes
+            return self._bot_info
+        except Exception as e:
+            if self.exception_handler:
+                self.exception_handler.handle_exception(e, context="get_me")
+            raise SwiftBotError(f"Failed to get bot info: {e}")
+
+    async def _handle_exception(self, exception: Exception, context: str = "unknown"):
+        """Handle exceptions through centralized handler"""
+        if self.exception_handler:
+            await self.exception_handler.handle_exception_async(exception, context)
+
+        # Update statistics
+        exc_type = type(exception).__name__
+        self._stats['exceptions_by_type'][exc_type] = self._stats['exceptions_by_type'].get(exc_type, 0) + 1
+        self._stats['errors_handled'] += 1
 
     async def _process_update(self, raw_update: Dict):
         """
-        Process a single update through router and middleware.
-        FIXED: Properly create Update object and handle all update types.
+        Process a single update through router and middleware with enhanced error handling.
 
         Args:
             raw_update: Raw update dictionary from Telegram API
@@ -199,16 +249,17 @@ class SwiftBot:
             update_obj = update.get_update_object()
 
             if not update_type or not update_obj:
-                logger.warning(f"Unknown update type: {raw_update}")
+                await self._handle_exception(
+                    SwiftBotError(f"Unknown update type: {raw_update}"),
+                    "update_processing"
+                )
                 return
-
-            logger.debug(f"Processing {update_type} update")
 
             # Route to handler
             handler, match, event_type = await self.router.route(update_obj, update_type)
 
             if not handler:
-                logger.debug(f"No handler found for {update_type}")
+                # This is normal, not an error
                 return
 
             # Create context with proper parameters
@@ -221,20 +272,19 @@ class SwiftBot:
             self._stats['handlers_executed'] += 1
 
         except Exception as e:
-            logger.error(f"Error processing update: {e}")
-            self._stats['errors_handled'] += 1
+            await self._handle_exception(e, "update_processing")
 
             # Try to execute error handlers in middleware
             try:
                 for middleware in self.middleware:
                     if hasattr(middleware, 'on_error'):
                         await middleware.on_error(None, e)
-            except:
-                pass
+            except Exception as middleware_error:
+                await self._handle_exception(middleware_error, "middleware_error_handling")
 
     async def _execute_middleware_chain(self, ctx: Context, handler: Callable):
         """
-        Execute middleware chain and handler.
+        Execute middleware chain and handler with improved error handling.
 
         Args:
             ctx: Context object
@@ -256,7 +306,7 @@ class SwiftBot:
                 try:
                     await handler(ctx)
                 except Exception as e:
-                    logger.error(f"Error in handler {handler.__name__}: {e}")
+                    await self._handle_exception(e, f"handler_{handler.__name__}")
                     raise
 
         try:
@@ -268,7 +318,7 @@ class SwiftBot:
                     if hasattr(middleware, 'on_error'):
                         await middleware.on_error(ctx, e)
                 except Exception as middleware_error:
-                    logger.error(f"Error in middleware error handler: {middleware_error}")
+                    await self._handle_exception(middleware_error, "middleware_error_handler")
 
             # Re-raise if not handled
             raise
@@ -285,7 +335,7 @@ class SwiftBot:
         circuit_breaker_timeout: int = 60,
     ):
         """
-        Start bot in polling mode (long polling).
+        Start bot in polling mode with enhanced error handling.
 
         Args:
             timeout: Long polling timeout
@@ -298,7 +348,7 @@ class SwiftBot:
             circuit_breaker_timeout: Circuit breaker reset time
         """
         if self.running:
-            raise RuntimeError("Bot is already running")
+            raise SwiftBotError("Bot is already running")
 
         self.running = True
         self._stats['start_time'] = asyncio.get_event_loop().time()
@@ -309,15 +359,13 @@ class SwiftBot:
 
             # Get bot info
             bot_info = await self.get_me()
-            logger.info(f"Bot started: @{bot_info.get('username', 'Unknown')}")
-            logger.info(f"Worker pool: {self.worker_pool.num_workers} workers")
-            logger.info(f"Connection pool: {self.connection_pool.max_connections} connections")
-            logger.info(f"HTTP/2: {'enabled' if self.connection_pool.enable_http2 else 'disabled'}")
 
             # Drop pending updates if requested
             if drop_pending_updates:
-                await self.api.get_updates(offset=-1)
-                logger.info("Dropped pending updates")
+                try:
+                    await self.api.get_updates(offset=-1)
+                except Exception as e:
+                    await self._handle_exception(e, "drop_pending_updates")
 
             consecutive_failures = 0
             backoff_time = 0
@@ -347,15 +395,14 @@ class SwiftBot:
                             await self.worker_pool.submit(self._process_update, update)
 
                         except Exception as e:
-                            logger.error(f"Error submitting update to worker pool: {e}")
+                            await self._handle_exception(e, "update_submission")
 
                 except Exception as e:
                     consecutive_failures += 1
-                    logger.error(f"Error in polling loop: {e}")
+                    await self._handle_exception(e, "polling_loop")
 
                     # Circuit breaker
                     if consecutive_failures >= circuit_breaker_threshold:
-                        logger.warning(f"Circuit breaker opened after {consecutive_failures} failures")
                         await asyncio.sleep(circuit_breaker_timeout)
                         consecutive_failures = 0
                         continue
@@ -365,20 +412,18 @@ class SwiftBot:
                         backoff_factor * (2 ** consecutive_failures),
                         max_backoff
                     )
-                    logger.info(f"Retrying in {backoff_time}s after error: {e}")
                     await asyncio.sleep(backoff_time)
 
         except KeyboardInterrupt:
-            logger.info("Received KeyboardInterrupt, stopping...")
+            pass  # Graceful shutdown
         except Exception as e:
-            logger.error(f"Fatal error in polling: {e}")
-            raise
+            await self._handle_exception(e, "polling_fatal")
+            raise SwiftBotError(f"Fatal error in polling: {e}")
         finally:
             # Cleanup
             self.running = False
             await self.worker_pool.stop()
             await self.connection_pool.close()
-            logger.info("Bot stopped")
 
     async def run_webhook(
         self,
@@ -392,23 +437,13 @@ class SwiftBot:
         allowed_updates: Optional[List[str]] = None,
     ):
         """
-        Start bot in webhook mode.
-
-        Args:
-            host: Server host
-            port: Server port
-            webhook_url: Public webhook URL
-            cert_path: SSL certificate path
-            key_path: SSL key path
-            drop_pending_updates: Drop pending updates
-            secret_token: Webhook secret token
-            allowed_updates: Update types to receive
+        Start bot in webhook mode with enhanced error handling.
         """
         if not webhook_url:
-            raise ValueError("webhook_url is required for webhook mode")
+            raise ConfigurationError("webhook_url is required for webhook mode")
 
         if self.running:
-            raise RuntimeError("Bot is already running")
+            raise SwiftBotError("Bot is already running")
 
         self.running = True
         self._stats['start_time'] = asyncio.get_event_loop().time()
@@ -418,7 +453,6 @@ class SwiftBot:
             await self.worker_pool.start()
 
             # Set webhook
-            logger.info(f"Setting webhook: {webhook_url}")
             await self.api.set_webhook(
                 url=webhook_url,
                 max_connections=self.worker_pool.num_workers,
@@ -438,23 +472,21 @@ class SwiftBot:
             )
 
             await server.start()
-            logger.info(f"Webhook server started on {host}:{port}")
 
             # Keep running
             while self.running:
                 await asyncio.sleep(1)
 
         except KeyboardInterrupt:
-            logger.info("Received KeyboardInterrupt, stopping...")
+            pass  # Graceful shutdown
         except Exception as e:
-            logger.error(f"Fatal error in webhook mode: {e}")
-            raise
+            await self._handle_exception(e, "webhook_fatal")
+            raise SwiftBotError(f"Fatal error in webhook mode: {e}")
         finally:
             if 'server' in locals():
                 await server.stop()
             await self.worker_pool.stop()
             await self.connection_pool.close()
-            logger.info("Bot stopped")
 
     async def run(
         self,
@@ -473,16 +505,15 @@ class SwiftBot:
         elif mode == "webhook":
             await self.run_webhook(**kwargs)
         else:
-            raise ValueError(f"Invalid mode: {mode}. Use 'polling' or 'webhook'")
+            raise ConfigurationError(f"Invalid mode: {mode}. Use 'polling' or 'webhook'")
 
     def stop(self):
         """Stop the bot"""
         self.running = False
-        logger.info("Bot stop requested")
 
     def get_stats(self) -> Dict:
         """
-        Get bot statistics.
+        Get bot statistics with enhanced metrics.
 
         Returns:
             Dictionary with statistics
@@ -496,11 +527,13 @@ class SwiftBot:
             "updates_processed": self._stats['updates_processed'],
             "errors_handled": self._stats['errors_handled'],
             "handlers_executed": self._stats['handlers_executed'],
+            "exceptions_by_type": self._stats['exceptions_by_type'],
             "worker_pool": self.worker_pool.get_stats() if hasattr(self.worker_pool, 'get_stats') else {},
             "connection_pool": self.connection_pool.get_stats() if hasattr(self.connection_pool, 'get_stats') else {},
             "router": self.router.get_stats(),
             "middleware_count": len(self.middleware),
-        }
+            "bot_info_cached": self._bot_info is not None,
+        }      
 
     # ===========================================
     # TELEGRAM API FORWARDING METHODS
