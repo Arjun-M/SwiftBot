@@ -1,5 +1,5 @@
 """
-Rate limiting middleware
+Rate limiting middleware with cache-based storage
 Copyright (c) 2025 Arjun-M/SwiftBot
 """
 
@@ -12,10 +12,8 @@ class RateLimiter(Middleware):
     """
     Rate limiting middleware to prevent spam and abuse.
 
-    Supports multiple strategies:
-    - fixed_window: Fixed time windows
-    - sliding_window: Sliding time windows (more accurate)
-    - token_bucket: Token bucket algorithm
+    Uses in-memory cache for rate limiting without external storage dependencies.
+    Features automatic cleanup and configurable strategies.
 
     Copyright (c) 2025 Arjun-M/SwiftBot
     """
@@ -25,59 +23,54 @@ class RateLimiter(Middleware):
         rate: int = 10,
         per: int = 60,
         strategy: str = "sliding_window",
-        storage=None,
         key_func=None,
-        on_exceeded=None
+        on_exceeded=None,
+        cleanup_interval: int = 300
     ):
         """
-        Initialize rate limiter.
+        Initialize rate limiter with cache-based storage.
 
         Args:
             rate: Maximum requests
             per: Time period in seconds
             strategy: Rate limiting strategy
-            storage: Storage backend (Redis recommended for multi-instance)
             key_func: Function to generate rate limit key from context
             on_exceeded: Callback when rate limit exceeded
+            cleanup_interval: Interval for cleaning old entries (seconds)
         """
         self.rate = rate
         self.per = per
         self.strategy = strategy
-        self.storage = storage
-        self.key_func = key_func or (lambda ctx: f"user:{ctx.user.id}")
+        self.key_func = key_func or (lambda ctx: f"user:{ctx.user.id if ctx.user else 'anonymous'}")
         self.on_exceeded = on_exceeded
+        self.cleanup_interval = cleanup_interval
 
-        # In-memory storage (fallback)
-        self._memory_store = defaultdict(list)
+        # Cache-based storage
+        self._request_cache = defaultdict(list)
+        self._last_cleanup = time.time()
 
     async def on_update(self, ctx, next_handler):
         """Check rate limit before processing"""
         key = self.key_func(ctx)
+        current_time = time.time()
 
-        if await self._is_rate_limited(key):
+        # Periodic cleanup
+        if current_time - self._last_cleanup > self.cleanup_interval:
+            self._cleanup_old_entries(current_time)
+
+        if self._is_rate_limited(key, current_time):
             if self.on_exceeded:
                 await self.on_exceeded(ctx)
             else:
                 await ctx.reply("⚠️ Rate limit exceeded. Please slow down.")
             return
 
-        await self._record_request(key)
+        self._record_request(key, current_time)
         await next_handler()
 
-    async def _is_rate_limited(self, key: str) -> bool:
-        """Check if key is rate limited"""
-        current_time = time.time()
-
-        if self.storage:
-            # Use external storage (Redis)
-            return await self._check_redis(key, current_time)
-        else:
-            # Use in-memory storage
-            return self._check_memory(key, current_time)
-
-    def _check_memory(self, key: str, current_time: float) -> bool:
-        """Check rate limit using in-memory store"""
-        requests = self._memory_store[key]
+    def _is_rate_limited(self, key: str, current_time: float) -> bool:
+        """Check if key is rate limited using cache"""
+        requests = self._request_cache[key]
 
         # Remove old requests
         cutoff_time = current_time - self.per
@@ -85,30 +78,41 @@ class RateLimiter(Middleware):
 
         return len(requests) >= self.rate
 
-    async def _check_redis(self, key: str, current_time: float) -> bool:
-        """Check rate limit using Redis"""
-        # Redis implementation
-        # This is a simplified version - production should use Redis ZSET
-        try:
-            count = await self.storage.get(f"ratelimit:{key}")
-            return int(count or 0) >= self.rate
-        except:
-            return False
+    def _record_request(self, key: str, current_time: float):
+        """Record a request in cache"""
+        self._request_cache[key].append(current_time)
 
-    async def _record_request(self, key: str):
-        """Record a request"""
+    def _cleanup_old_entries(self, current_time: float):
+        """Clean up old cache entries"""
+        cutoff_time = current_time - self.per
+
+        # Clean up request logs
+        for key in list(self._request_cache.keys()):
+            self._request_cache[key] = [t for t in self._request_cache[key] if t > cutoff_time]
+
+            # Remove empty entries
+            if not self._request_cache[key]:
+                del self._request_cache[key]
+
+        self._last_cleanup = current_time
+
+    def get_stats(self) -> dict:
+        """Get rate limiter statistics"""
         current_time = time.time()
+        active_users = 0
+        total_requests = 0
 
-        if self.storage:
-            await self._record_redis(key, current_time)
-        else:
-            self._memory_store[key].append(current_time)
+        for key, requests in self._request_cache.items():
+            if requests:
+                # Count recent requests
+                recent_requests = [t for t in requests if current_time - t < self.per]
+                if recent_requests:
+                    active_users += 1
+                    total_requests += len(recent_requests)
 
-    async def _record_redis(self, key: str, current_time: float):
-        """Record request in Redis"""
-        try:
-            # Increment counter
-            await self.storage.incr(f"ratelimit:{key}")
-            await self.storage.expire(f"ratelimit:{key}", self.per)
-        except:
-            pass
+        return {
+            'active_users': active_users,
+            'total_recent_requests': total_requests,
+            'rate_limit': f"{self.rate}/{self.per}s",
+            'strategy': self.strategy
+        }
