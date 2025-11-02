@@ -10,6 +10,18 @@ from .update_types import Update, Message as MessageType, User, Chat
 
 logger = logging.getLogger(__name__)
 
+class MemoryStorage:
+    def __init__(self):
+        self.data = {}
+
+    async def set(self, key, value):
+        self.data[key] = value
+
+    async def get(self, key):
+        return self.data.get(key)
+
+    async def delete(self, key):
+        self.data.pop(key, None)
 
 class Context:
     """
@@ -88,9 +100,8 @@ class Context:
         # Middleware data storage
         self.middleware_data: Dict[str, Any] = {}
 
-        # User/chat data (populated by middleware)
-        self.user_data = None
-        self.chat_data = None
+        self.user_data = MemoryStorage()
+        self.chat_data = MemoryStorage()
         self.state = None
 
     def _extract_common_fields(self, update_obj):
@@ -477,20 +488,4 @@ class Context:
             except Exception as e:
                 logger.error(f"Error clearing state: {e}")
 
-    async def update_data(self, **kwargs):
-        """Update user data"""
-        if self.user_data:
-            try:
-                for key, value in kwargs.items():
-                    await self.user_data.set(key, value)
-            except Exception as e:
-                logger.error(f"Error updating data: {e}")
-
-    async def get_data(self, key: str, default=None):
-        """Get user data"""
-        if self.user_data:
-            try:
-                return await self.user_data.get(key, default)
-            except Exception as e:
-                logger.error(f"Error getting data: {e}")
-        return default
+    
