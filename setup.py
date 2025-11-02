@@ -31,22 +31,16 @@ setup(
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
+        "Topic :: Communications :: Chat",
+        "Framework :: AsyncIO"
     ],
     python_requires=">=3.10",
     install_requires=requirements,
     extras_require={
-        "redis": ["redis>=4.0.0"],
-        "postgres": ["asyncpg>=0.27.0"],
-        "mongo": ["motor>=3.0.0"],
-        "full": [
-            "redis>=4.0.0",
-            "asyncpg>=0.27.0",
-            "motor>=3.0.0",
-        ],
-    },
-    entry_points={
-        "console_scripts": [
-            "swiftbot=swiftbot.cli:main",
-        ],
+        "webhook": ["uvicorn>=0.23.0,<0.26.0"],
+        "dev": [
+            "pytest>=7.4.0,<8.0.0",
+            "pytest-asyncio>=0.21.0,<0.22.0",
+        ]
     },
 )
