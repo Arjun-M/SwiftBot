@@ -21,65 +21,53 @@ class Filter:
     """
 
     def __call__(self, message):
-        """Check if message passes this filter"""
         raise NotImplementedError
 
     def __and__(self, other):
-        """Combine filters with AND: filter1 & filter2"""
         return AndFilter(self, other)
 
     def __or__(self, other):
-        """Combine filters with OR: filter1 | filter2"""
         return OrFilter(self, other)
 
     def __invert__(self):
-        """Negate filter with NOT: ~filter"""
         return NotFilter(self)
 
 
 class AndFilter(Filter):
-    """Combines two filters with AND logic"""
-
     def __init__(self, filter1: Filter, filter2: Filter):
         self.filter1 = filter1
         self.filter2 = filter2
 
     def __call__(self, message):
         try:
-            return self.filter1(message) and self.filter2(message)
+            return bool(self.filter1(message)) and bool(self.filter2(message))
         except Exception as e:
             logger.error(f"Error in AndFilter: {e}")
             return False
 
-
 class OrFilter(Filter):
-    """Combines two filters with OR logic"""
-
     def __init__(self, filter1: Filter, filter2: Filter):
         self.filter1 = filter1
         self.filter2 = filter2
 
     def __call__(self, message):
         try:
-            return self.filter1(message) or self.filter2(message)
+            return bool(self.filter1(message)) or bool(self.filter2(message))
         except Exception as e:
             logger.error(f"Error in OrFilter: {e}")
             return False
 
-
 class NotFilter(Filter):
-    """Negates a filter with NOT logic"""
-
     def __init__(self, filter: Filter):
         self.filter = filter
 
     def __call__(self, message):
         try:
-            return not self.filter(message)
+            return not bool(self.filter(message))
         except Exception as e:
             logger.error(f"Error in NotFilter: {e}")
-            return True  # If filter fails, NOT returns True
-
+            return True
+            
 
 class TextFilter(Filter):
     """Filters messages that have text"""
@@ -344,67 +332,131 @@ class CaptionRegexFilter(Filter):
             return False
 
 
-class UserFilter(Filter):
-    """Filters messages from specific users"""
+class CommandFilter(Filter):
+    """
+    Filters command messages with proper validation.
+    BUG FIX: Added input validation for command strings
+    """
+    def __init__(self, commands: Union[str, List[str]]):
+        if isinstance(commands, str):
+            commands = [commands]
+        
+        # Validate commands
+        validated_commands = []
+        for cmd in commands:
+            if not isinstance(cmd, str):
+                logger.warning(f"Skipping non-string command: {cmd}")
+                continue
+            # Ensure command starts with /
+            if not cmd.startswith('/'):
+                cmd = '/' + cmd
+            validated_commands.append(cmd)
+        
+        if not validated_commands:
+            raise ValueError("At least one valid command string required")
+        
+        self.commands = validated_commands
+        self.commands_lower = [cmd.lower() for cmd in self.commands]
 
+    def __call__(self, message):
+        try:
+            if not hasattr(message, 'text') or not message.text:
+                return False
+
+            text = message.text.strip()
+            if not text.startswith('/'):
+                return False
+
+            # Extract command part (before space and @)
+            command_part = text.split()[0].split('@')[0].lower()
+
+            return command_part in self.commands_lower
+        except Exception as e:
+            logger.error(f"Error in CommandFilter: {e}")
+            return False
+
+class UserFilter(Filter):
+    """
+    Filters messages from specific users with ID validation.
+    BUG FIX: Added validation of user IDs
+    """
     def __init__(self, user_ids: Union[int, List[int]]):
-        """
-        Args:
-            user_ids: User ID(s) to match
-        """
         if isinstance(user_ids, int):
             user_ids = [user_ids]
-        self.user_ids = set(user_ids)
+        
+        # Validate IDs
+        validated_ids = []
+        for uid in user_ids:
+            if not isinstance(uid, int):
+                logger.warning(f"Skipping non-integer user ID: {uid}")
+                continue
+            if uid <= 0:
+                logger.warning(f"Skipping invalid user ID: {uid}")
+                continue
+            validated_ids.append(uid)
+        
+        if not validated_ids:
+            raise ValueError("At least one valid user ID required")
+        
+        self.user_ids = set(validated_ids)
 
     def __call__(self, message):
         try:
             return (hasattr(message, 'from_user') and 
                    message.from_user and 
                    message.from_user.id in self.user_ids)
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error in UserFilter: {e}")
             return False
 
-
 class ChatFilter(Filter):
-    """Filters messages from specific chats"""
-
+    """
+    Filters messages from specific chats with ID validation.
+    BUG FIX: Added validation of chat IDs
+    """
     def __init__(self, chat_ids: Union[int, List[int]]):
-        """
-        Args:
-            chat_ids: Chat ID(s) to match
-        """
         if isinstance(chat_ids, int):
             chat_ids = [chat_ids]
-        self.chat_ids = set(chat_ids)
+        
+        # Validate IDs
+        validated_ids = []
+        for cid in chat_ids:
+            if not isinstance(cid, int):
+                logger.warning(f"Skipping non-integer chat ID: {cid}")
+                continue
+            validated_ids.append(cid)
+        
+        if not validated_ids:
+            raise ValueError("At least one valid chat ID required")
+        
+        self.chat_ids = set(validated_ids)
 
     def __call__(self, message):
         try:
             return (hasattr(message, 'chat') and 
                    message.chat and 
                    message.chat.id in self.chat_ids)
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error in ChatFilter: {e}")
             return False
 
-
 class CustomFilter(Filter):
-    """Custom filter using a callable function with error handling"""
-
+    """
+    Custom filter with improved exception handling.
+    BUG FIX: Better logging with filter name context
+    """
     def __init__(self, func: Callable, name: str = "CustomFilter"):
-        """
-        Args:
-            func: Function that takes message and returns bool
-            name: Name for debugging purposes
-        """
         self.func = func
         self.name = name
 
     def __call__(self, message):
         try:
-            return bool(self.func(message))
+            result = self.func(message)
+            return bool(result)
         except Exception as e:
-            logger.error(f"Error in {self.name}: {e}")
+            logger.error(f"Error in {self.name}: {e}", exc_info=True)
             return False
-
+ 
 
 class Filters:
     """
@@ -531,16 +583,13 @@ class Filters:
     def all(*filters: Filter) -> Filter:
         """
         Create filter that matches when ALL provided filters match.
-
-        Args:
-            *filters: Filters to combine with AND
-
-        Returns:
-            Combined filter
+        BUG FIX: Proper handling of edge cases
         """
         if not filters:
             return CustomFilter(lambda x: True, "AllowAll")
-
+        if len(filters) == 1:
+            return filters[0]
+        
         result = filters[0]
         for f in filters[1:]:
             result = result & f
@@ -550,16 +599,13 @@ class Filters:
     def any(*filters: Filter) -> Filter:
         """
         Create filter that matches when ANY provided filter matches.
-
-        Args:
-            *filters: Filters to combine with OR
-
-        Returns:
-            Combined filter
+        BUG FIX: Proper handling of edge cases
         """
         if not filters:
             return CustomFilter(lambda x: False, "DenyAll")
-
+        if len(filters) == 1:
+            return filters[0]
+        
         result = filters[0]
         for f in filters[1:]:
             result = result | f
