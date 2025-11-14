@@ -13,15 +13,15 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="swiftbot",
-    packages=find_packages(where='SwiftBot'),
-    package_dir={'': 'SwiftBot'},
-    version="1.0.0",
+    version="1.0.2",
     author="Arjun-M",
     author_email="",
     description="Ultra-fast Telegram bot framework with 30× faster routing & consume 20-30% less memory",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/Arjun-M/SwiftBot",
+    package_dir={'': '.'},
+    packages=find_packages(where='.'),
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
