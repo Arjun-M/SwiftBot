@@ -1,5 +1,5 @@
 # SwiftBot - Ultra-Fast Telegram Bot Client
-![Banner](https://i.ibb.co/G45tbxxJ/1762083243140.jpg)
+![Banner](banner.jpg)
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -161,7 +161,6 @@ client.use(AnalyticsCollector(enable_real_time=True))
 |---------|-----------------|---------------------|---------|
 | Command Routing | O(m) Trie | O(n) Linear | O(n) Linear |
 | HTTP/2 | ✅ Yes | ❌ No | ❌ No |
-| External Deps | ❌ None | ⚠️ Many | ⚠️ Some |
 | Memory Usage | 🟢 Low | 🟡 Medium | 🟡 Medium |
 | Throughput | 1000+ msg/s | ~100 msg/s | ~200 msg/s |
 
