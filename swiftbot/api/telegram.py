@@ -7,10 +7,167 @@ Reference: https://core.telegram.org/bots/api
 """
 
 from typing import Optional, List, Union, Any, Dict
+import io
 import json
+
+from ..exceptions.telegram import TelegramError
+
+
+class InputFile:
+    """
+    Represents a local file to upload.
+
+    Use this to send local files instead of file IDs or URLs:
+
+        from swiftbot.api.telegram import InputFile
+
+        await ctx.send_photo(photo=InputFile("/home/photo.png", filename="photo.png"))
+
+    Bytes content can also be passed directly:
+
+        await ctx.send_document(document=InputFile(raw_bytes, filename="data.csv"))
+    """
+
+    def __init__(self, content: Union[str, bytes], filename: Optional[str] = None):
+        """
+        Args:
+            content: Path to a local file, or raw ``bytes`` content.
+            filename: File name to use in the multipart upload. Required when
+                ``content`` is raw bytes; derived from the path otherwise.
+        """
+        if isinstance(content, bytes):
+            self.file = io.BytesIO(content)
+            if not filename:
+                raise ValueError("filename is required when passing raw bytes")
+            self.filename = filename
+        else:
+            if not content:
+                raise ValueError("file path cannot be empty")
+            self.file = open(content, "rb")
+            self.filename = filename or content.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+
+    def __del__(self):
+        if getattr(self, "file", None) is not None and not self.file.closed:
+            self.file.close()
 
 
 class TelegramAPI:
+    """
+    Complete Telegram Bot API implementation with ALL methods.
+
+    Covers:
+    - Getting Updates
+    - Sending Messages (text, media, files)
+    - Editing & Deleting
+    - Inline Mode
+    - Callback Queries
+    - Chat Management
+    - User Management
+    - Stickers
+    - Payments
+    - Games
+    - Forum Topics
+    - And more...
+
+    Copyright (c) 2025 Arjun-M/SwiftBot
+    """
+
+    def __init__(self, token: str, connection_pool, base_url: str = "https://api.telegram.org"):
+        """
+        Initialize Telegram API wrapper.
+
+        Args:
+            token: Bot token from @BotFather
+            connection_pool: HTTP connection pool
+            base_url: API base URL
+        """
+        self.token = token
+        self.pool = connection_pool
+        self.base_url = f"{base_url}/bot{token}"
+
+    async def _request(self, method: str, **params) -> Any:
+        """
+        Make API request with automatic error handling.
+
+        Args:
+            method: API method name
+            **params: Method parameters. ``InputFile`` values are sent as
+                multipart uploads instead of JSON.
+
+        Returns:
+            API response result
+
+        Raises:
+            TelegramError: Typed subclass matching the Telegram error
+                (e.g. ``RetryAfterError``, ``BadRequestError``)
+        """
+        url = f"{self.base_url}/{method}"
+
+        # Remove None values
+        params = {k: v for k, v in params.items() if v is not None}
+
+        # Convert objects to JSON
+        for key, value in params.items():
+            if isinstance(value, (dict, list)):
+                params[key] = json.dumps(value)
+
+        # Multipart upload when an InputFile is present
+        files = {k: v for k, v in params.items() if isinstance(v, InputFile)}
+        if files:
+            fields = {k: v for k, v in params.items() if not isinstance(v, InputFile)}
+            response = await self.pool.post(
+                url, json=fields if fields else None,
+                files={k: (v.filename, v.file) for k, v in files.items()},
+            )
+        else:
+            response = await self.pool.post(url, json=params)
+
+        data = response.json()
+
+        if not data.get('ok'):
+            raise TelegramError.from_response(data)
+
+        return data.get('result')
+
+    # ==========================================
+    # Files
+    # ==========================================
+
+    async def get_file(self, file_id: str) -> Dict:
+        """
+        Get basic info about a file and prepare it for download.
+
+        Args:
+            file_id: File identifier to get info about
+
+        Returns:
+            Dict with ``file_path`` and other file info
+        """
+        return await self._request("getFile", file_id=file_id)
+
+    async def download_file(self, file_id: str) -> bytes:
+        """
+        Download a file from Telegram by its ``file_id``.
+
+        Args:
+            file_id: File identifier to download
+
+        Returns:
+            Raw file bytes
+        """
+        info = await self.get_file(file_id)
+        file_path = info.get("file_path")
+        if not file_path:
+            raise TelegramError.from_response({
+                "ok": False, "error_code": 400,
+                "description": f"No file_path in getFile response: {info}",
+            })
+        # Download from the file endpoint using the same base URL so local
+        # Bot API servers (e.g. in Telegram-Test environments) are supported.
+        url = f"{self.base_url}/{file_path}"
+        response = await self.pool.get(url)
+        return response.content
+
     """
     Complete Telegram Bot API implementation with ALL methods.
 

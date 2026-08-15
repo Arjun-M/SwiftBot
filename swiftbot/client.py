@@ -8,6 +8,7 @@ import asyncio
 from typing import Optional, Dict, List, Callable, Any
 from .router import CommandRouter
 from .context import Context
+from .storage import BaseStorage, MemoryStorage, StateManager
 from .connection.pool import HTTPConnectionPool
 from .connection.worker import WorkerPool
 from .api.telegram import TelegramAPI
@@ -27,15 +28,18 @@ class SwiftBot:
     SwiftBot - Ultra-fast Telegram bot framework with enhanced error handling.
 
     Features:
-    - 30× faster command routing with Trie data structure
-    - HTTP/2 connection pooling for maximum throughput
-    - Worker pool for concurrent update processing
+    - Trie-based command routing with O(m) lookups
+    - HTTP/2 connection pooling with HTTPX
+    - Worker pool with bounded concurrency for update processing
+    - Telegram ``Retry-After`` (429) compliance
+    - Typed Telegram API error hierarchy
     - Telethon-inspired decorator syntax
-    - Enterprise-grade middleware system
-    - Multiple storage backends (Redis, PostgreSQL, MongoDB, File)
-    - Broadcast system with progress tracking
+    - Composable filter system
+    - Middleware chain
+    - FSM with pluggable persistent storage (memory, JSON file)
+    - Local file upload and download support
     - Centralized exception handling
-    - Optimized logging through middleware
+    - Webhook and polling modes
 
     Example:
         client = SwiftBot(token="YOUR_TOKEN", worker_pool_size=50)
@@ -64,6 +68,8 @@ class SwiftBot:
         rate_limiter: Optional[Dict] = None,
         debug: bool = False,
         enable_centralized_exceptions: bool = True,
+        storage: Optional[Any] = None,
+        state_ttl: Optional[float] = None,
     ):
         """
         Initialize SwiftBot client.
@@ -82,6 +88,11 @@ class SwiftBot:
             rate_limiter: Rate limiter configuration
             debug: Enable debug mode (handled by middleware)
             enable_centralized_exceptions: Enable centralized exception handling
+            storage: Storage backend for FSM state and per-user/per-chat data.
+                Defaults to ``MemoryStorage()``. Use ``JSONFileStorage(path)``
+                for persistence across restarts, or plug in your own
+                ``BaseStorage`` subclass (Redis/PostgreSQL/MongoDB).
+            state_ttl: Optional seconds after which an idle user state expires.
         """
         # Validate token
         if not token or not isinstance(token, str):
@@ -139,6 +150,12 @@ class SwiftBot:
         # Running state
         self.running = False
         self._update_offset = 0
+
+        # FSM storage: pluggable backend + state manager
+        if storage is not None and not isinstance(storage, BaseStorage):
+            raise ConfigurationError("storage must be a BaseStorage instance")
+        self.storage: BaseStorage = storage if storage is not None else MemoryStorage()
+        self._state_manager = StateManager(self.storage, ttl=state_ttl)
 
         # Bot info cache with TTL
         self._bot_info = None
@@ -209,7 +226,7 @@ class SwiftBot:
         Returns:
             Bot user object
         """
-        current_time = asyncio.get_event_loop().time()
+        current_time = asyncio.get_running_loop().time()
 
         if use_cache and self._bot_info and current_time < self._bot_info_expires:
             return self._bot_info
@@ -424,6 +441,7 @@ class SwiftBot:
             self.running = False
             await self.worker_pool.stop()
             await self.connection_pool.close()
+            await self.storage.close()
 
     async def run_webhook(
         self,
@@ -483,10 +501,10 @@ class SwiftBot:
             await self._handle_exception(e, "webhook_fatal")
             raise SwiftBotError(f"Fatal error in webhook mode: {e}")
         finally:
-            if 'server' in locals():
-                await server.stop()
             await self.worker_pool.stop()
             await self.connection_pool.close()
+            if 'server' in locals():
+                await server.stop()
 
     async def run(
         self,
@@ -518,7 +536,7 @@ class SwiftBot:
         Returns:
             Dictionary with statistics
         """
-        current_time = asyncio.get_event_loop().time()
+        current_time = asyncio.get_running_loop().time()
         uptime = current_time - self._stats['start_time'] if self._stats['start_time'] else 0
 
         return {
@@ -541,16 +559,19 @@ class SwiftBot:
     # Can be called from main thread, startup, or anywhere outside decorators
     # ===========================================
 
-    async def get_me(self):
-        """Get bot information (cached)"""
-        if not self._bot_info:
-            self._bot_info = await self.api.get_me()
-        return self._bot_info
 
     async def get_updates(self, offset: Optional[int] = None, limit: int = 100, 
                          timeout: int = 0, allowed_updates: Optional[List[str]] = None):
         """Get pending updates"""
         return await self.api.get_updates(offset, limit, timeout, allowed_updates)
+
+    async def get_file(self, file_id: str):
+        """Get info about a file (path, size, etc.)"""
+        return await self.api.get_file(file_id)
+
+    async def download_file(self, file_id: str):
+        """Download a file from Telegram by its file_id (returns raw bytes)"""
+        return await self.api.download_file(file_id)
 
     async def log_out(self):
         """Log out from cloud Bot API server"""

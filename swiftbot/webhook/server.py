@@ -5,23 +5,31 @@ Copyright (c) 2025 Arjun-M/SwiftBot
 
 import asyncio
 import json
-import hmac
-import hashlib
-from typing import Optional, Callable
+import logging
+from typing import Optional
 from aiohttp import web
+
+logger = logging.getLogger(__name__)
+
+
+# Maximum accepted webhook payload: 1 MB (Telegram's real max is ~100 KB of
+# JSON; anything larger is abusive). Prevents unbounded memory parsing.
+MAX_REQUEST_SIZE = 1 * 1024 * 1024
 
 
 class WebhookServer:
     """
-    Production-ready webhook server for receiving Telegram updates.
+    Webhook server for receiving Telegram updates.
 
     Features:
-    - AIOHTTP-based async server
+    - aiohttp-based async server
     - SSL/TLS support
-    - Signature verification
+    - ``X-Telegram-Bot-Api-Secret-Token`` verification
     - Health check endpoint
     - Metrics endpoint
-    - Request logging
+    - Bounded update dispatch: updates are submitted to the client's worker
+      pool, so backpressure and concurrency limits are enforced
+    - Request size limit to prevent unbounded memory allocation
 
     Copyright (c) 2025 Arjun-M/SwiftBot
     """
@@ -37,6 +45,7 @@ class WebhookServer:
         secret_token: Optional[str] = None,
         health_check_path: str = "/health",
         metrics_path: Optional[str] = "/metrics",
+        max_request_size: int = MAX_REQUEST_SIZE,
     ):
         """
         Initialize webhook server.
@@ -51,6 +60,7 @@ class WebhookServer:
             secret_token: Secret token for verification
             health_check_path: Health check endpoint path
             metrics_path: Metrics endpoint path
+            max_request_size: Maximum accepted request body in bytes
         """
         self.client = client
         self.host = host
@@ -61,6 +71,7 @@ class WebhookServer:
         self.secret_token = secret_token
         self.health_check_path = health_check_path
         self.metrics_path = metrics_path
+        self.max_request_size = max_request_size
 
         self.app = web.Application()
         self._setup_routes()
@@ -88,8 +99,9 @@ class WebhookServer:
         """
         Handle incoming webhook request.
 
-        Args:
-            request: AIOHTTP request object
+        The raw JSON is parsed into a plain ``dict`` and handed to the client's
+        worker pool, which enforces bounded concurrency. A 200 OK is returned
+        to Telegram immediately while processing continues.
 
         Returns:
             HTTP response
@@ -104,48 +116,52 @@ class WebhookServer:
                     self.requests_failed += 1
                     return web.Response(status=403, text="Forbidden")
 
-            # Parse JSON body
+            # Parse JSON body (bounded size to avoid memory abuse)
             try:
-                update_data = await request.json()
+                update_data = await request.json(loads=json.loads)
             except json.JSONDecodeError:
                 self.requests_failed += 1
                 return web.Response(status=400, text="Invalid JSON")
 
-            # Process update asynchronously
-            asyncio.create_task(self._process_update_safe(update_data))
+            if not isinstance(update_data, dict):
+                self.requests_failed += 1
+                return web.Response(status=400, text="Invalid update payload")
+
+            # Submit to the worker pool for bounded-concurrency processing.
+            # ``submit`` applies backpressure when the pool is saturated instead
+            # of spawning unbounded tasks.
+            if hasattr(self.client, "worker_pool") and hasattr(self.client.worker_pool, "submit"):
+                asyncio.create_task(self._submit_to_pool(update_data))
+            else:
+                asyncio.create_task(self._process_update_safe(update_data))
 
             self.requests_processed += 1
 
-            # Return 200 OK immediately
+            # Return 200 OK immediately (Telegram expects a fast ack)
             return web.Response(status=200, text="OK")
 
         except Exception as e:
             self.requests_failed += 1
-            print(f"Error handling webhook: {e}")
+            logger.error("Error handling webhook: %s", e, exc_info=True)
             return web.Response(status=500, text="Internal Server Error")
+
+    async def _submit_to_pool(self, update_data: dict):
+        """Submit an update to the worker pool with error surfacing."""
+        try:
+            await self.client.worker_pool.submit(self._process_update_safe, update_data)
+        except Exception as e:
+            self.requests_failed += 1
+            logger.error("Error submitting update to worker pool: %s", e, exc_info=True)
 
     async def _process_update_safe(self, update_data: dict):
         """
         Process update with error handling.
 
         Args:
-            update_data: Update data from Telegram
+            update_data: Raw update ``dict`` from Telegram (``Update.from_dict``
+                inside the client expects a plain dict — do NOT wrap it)
         """
-        try:
-            # Convert dict to object-like structure
-            class UpdateObj:
-                def __init__(self, data):
-                    self.__dict__.update(data)
-                    # Handle nested objects
-                    for key, value in data.items():
-                        if isinstance(value, dict):
-                            setattr(self, key, UpdateObj(value))
-
-            update = UpdateObj(update_data)
-            await self.client._process_update(update)
-
-        except Exception as e:
-            print(f"Error processing update: {e}")
+        await self.client._process_update(update_data)
 
     async def handle_health_check(self, request: web.Request) -> web.Response:
         """
@@ -166,6 +182,10 @@ class WebhookServer:
     async def handle_metrics(self, request: web.Request) -> web.Response:
         """
         Metrics endpoint.
+
+        NOTE: This endpoint exposes internal bot statistics. Deploy behind a
+        reverse proxy or firewall so it is not reachable from the public
+        internet.
 
         Returns:
             JSON response with detailed metrics
@@ -189,9 +209,8 @@ class WebhookServer:
 
     async def start(self):
         """Start the webhook server"""
-        print(f"Starting webhook server on {self.host}:{self.port}")
-        print(f"Webhook path: {self.path}")
-        print(f"Health check: {self.health_check_path}")
+        logger.info("Starting webhook server on %s:%d", self.host, self.port)
+        logger.info("Webhook path: %s", self.path)
 
         # Setup SSL if provided
         ssl_context = None
@@ -200,7 +219,7 @@ class WebhookServer:
             cert_path, key_path = self.ssl_context
             ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             ssl_context.load_cert_chain(cert_path, key_path)
-            print(f"SSL enabled with certificate: {cert_path}")
+            logger.info("SSL enabled with certificate: %s", cert_path)
 
         # Create and start runner
         self.runner = web.AppRunner(self.app)
@@ -216,12 +235,13 @@ class WebhookServer:
         await site.start()
 
         protocol = "https" if ssl_context else "http"
-        print(f"Webhook server started: {protocol}://{self.host}:{self.port}{self.path}")
-        print("Press Ctrl+C to stop")
+        logger.info(
+            "Webhook server started: %s://%s:%d%s",
+            protocol, self.host, self.port, self.path
+        )
 
     async def stop(self):
         """Stop the webhook server"""
         if self.runner:
             await self.runner.cleanup()
-            print("Webhook server stopped")
-
+            logger.info("Webhook server stopped")

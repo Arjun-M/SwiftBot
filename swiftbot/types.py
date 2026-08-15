@@ -4,8 +4,11 @@ Copyright (c) 2025 Arjun-M/SwiftBot
 """
 
 import re
+import logging
 from typing import Union, List, Callable, Optional, Pattern, Any
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -80,7 +83,14 @@ class EventType:
         compiled = []
         for p in pattern:
             if isinstance(p, str):
-                compiled.append(re.compile(p))
+                try:
+                    compiled.append(re.compile(p))
+                except re.error as e:
+                    # Never crash handler registration for a bad regex — the
+                    # router logs and skips handlers whose patterns fail to
+                    # compile at match time, so we drop the pattern here with
+                    # a warning instead of failing ``add_handler``.
+                    logger.warning(f"Skipping invalid regex pattern {p!r}: {e}")
             else:
                 compiled.append(p)
         return compiled
@@ -195,7 +205,7 @@ class CallbackQuery(EventType):
 
     Example:
         @client.on(CallbackQuery(data="button_1"))
-        @client.on(CallbackQuery(pattern=r"page_(\d+)"))
+        @client.on(CallbackQuery(pattern=r"^page_\\d+$"))
 
     Copyright (c) 2025 Arjun-M/SwiftBot
     """

@@ -4,9 +4,13 @@ Copyright (c) 2025 Arjun-M/SwiftBot
 """
 
 import asyncio
-import httpx
-from typing import Optional, Dict, Any
+import time as _time
 from contextlib import asynccontextmanager
+from typing import Optional, Dict, Any
+
+import httpx
+
+from ..exceptions.telegram import TooManyRequests
 
 
 class HTTPConnectionPool:
@@ -18,13 +22,9 @@ class HTTPConnectionPool:
     - HTTP/2 multiplexing (100+ concurrent requests per connection)
     - Automatic connection recycling
     - Exponential backoff retry logic
+    - Telegram ``Retry-After`` compliance (prevents bot bans)
     - Circuit breaker for fault tolerance
-    - DNS caching
-
-    Performance improvements:
-    - 30-50% reduction in latency vs creating new connections
-    - 10× increase in throughput with HTTP/2 multiplexing
-    - Automatic recovery from temporary failures
+    - Multipart file upload support
 
     Copyright (c) 2025 Arjun-M/SwiftBot
     """
@@ -40,33 +40,18 @@ class HTTPConnectionPool:
         max_retries: int = 3,
         backoff_factor: float = 0.5,
     ):
-        """
-        Initialize connection pool.
-
-        Args:
-            max_connections: Maximum total connections
-            max_keepalive_connections: Maximum persistent connections
-            keepalive_expiry: Keep-alive connection lifetime (seconds)
-            timeout: Request timeout (seconds)
-            connect_timeout: Connection establishment timeout
-            enable_http2: Enable HTTP/2 support
-            max_retries: Maximum retry attempts for failed requests
-            backoff_factor: Exponential backoff factor
-        """
         self.max_connections = max_connections
         self.max_keepalive = max_keepalive_connections
         self.enable_http2 = enable_http2
         self.max_retries = max_retries
         self.backoff_factor = backoff_factor
 
-        # Create httpx limits
         self.limits = httpx.Limits(
             max_connections=max_connections,
             max_keepalive_connections=max_keepalive_connections,
             keepalive_expiry=keepalive_expiry
         )
 
-        # Create timeout configuration
         self.timeout = httpx.Timeout(
             timeout=timeout,
             connect=connect_timeout,
@@ -75,10 +60,11 @@ class HTTPConnectionPool:
             pool=timeout
         )
 
-        # HTTP transport with retry support
+        # The pool transport handles transient network errors; HTTP-layer
+        # retry logic (429/5xx) now lives in ``request()`` where we can
+        # honor Telegram's ``Retry-After`` header.
         self.transport = httpx.AsyncHTTPTransport(
             http2=enable_http2,
-            retries=max_retries,
             limits=self.limits
         )
 
@@ -114,37 +100,54 @@ class HTTPConnectionPool:
         Check circuit breaker state.
         Opens circuit after threshold failures, closes after timeout.
         """
-        import time
-
         if self._circuit_open:
-            if time.time() - self._last_failure_time > self._circuit_reset_time:
+            if _time.time() - self._last_failure_time > self._circuit_reset_time:
                 self._circuit_open = False
                 self._failures = 0
                 return False
             return True
         return False
 
+    def _parse_retry_after(self, response: httpx.Response) -> Optional[float]:
+        """Read Telegram's ``Retry-After`` header (in seconds) if present."""
+        header = response.headers.get("retry-after")
+        if header:
+            try:
+                return float(header)
+            except (TypeError, ValueError):
+                return None
+        return None
+
     async def request(
         self,
         method: str,
         url: str,
         retry_on_status: list = None,
+        respect_retry_after: bool = True,
         **kwargs
     ) -> httpx.Response:
         """
         Make HTTP request with automatic retry and circuit breaker.
 
+        Retries 429 (respecting Telegram's ``Retry-After`` header/parameter)
+        and transient 5xx server errors with exponential backoff. Raises
+        ``TooManyRequests`` (a typed ``TelegramError``) once the retry
+        budget is exhausted on a 429, so bot code can catch it precisely.
+
         Args:
             method: HTTP method (GET, POST, etc.)
             url: Request URL
             retry_on_status: Status codes to retry on
-            **kwargs: Additional request parameters
+            respect_retry_after: Pause for ``Retry-After`` on 429 responses
+            **kwargs: Additional request parameters (``files=`` for multipart
+                uploads is passed straight through to httpx)
 
         Returns:
             HTTP response
 
         Raises:
-            Exception: If circuit breaker is open or max retries exceeded
+            TooManyRequests: Rate limit retries exhausted (with retry_after)
+            Exception: Circuit breaker open or max retries exceeded
         """
         if self._check_circuit_breaker():
             raise Exception("Circuit breaker is open")
@@ -162,23 +165,45 @@ class HTTPConnectionPool:
                 if response.status_code < 500:
                     self._failures = 0
 
-                # Retry on specific status codes
+                if response.status_code == 429:
+                    retry_after = self._parse_retry_after(response)
+                    if respect_retry_after and retry_after is not None:
+                        if attempt == self.max_retries - 1:
+                            raise TooManyRequests(
+                                retry_after=int(retry_after),
+                                description="Too Many Requests: retry after",
+                            )
+                        # Telegram dictates exactly how long to wait before
+                        # retrying. Sleeping once and retrying once is enough:
+                        # if the API is still throttling, the caller should
+                        # see the concrete ``TooManyRequests`` error.
+                        await asyncio.sleep(retry_after)
+                        continue
+                    if attempt < self.max_retries - 1:
+                        await asyncio.sleep(self.backoff_factor * (2 ** attempt))
+                        continue
+                    seconds = int(retry_after) if retry_after else None
+                    raise TooManyRequests(retry_after=seconds, description="Too Many Requests: retry after")
+
                 if response.status_code in retry_on_status:
                     if attempt < self.max_retries - 1:
                         await asyncio.sleep(self.backoff_factor * (2 ** attempt))
                         continue
+                    # Last attempt: surface the real status code to the caller
+                    # so ``TelegramAPI`` can raise a typed error.
+                    return response
 
                 return response
 
+            except TooManyRequests:
+                raise
             except Exception as e:
                 self._failures += 1
-                self._last_failure_time = __import__('time').time()
+                self._last_failure_time = _time.time()
 
-                # Open circuit breaker if threshold reached
                 if self._failures >= self._circuit_threshold:
                     self._circuit_open = True
 
-                # Retry with exponential backoff
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(self.backoff_factor * (2 ** attempt))
                     continue
@@ -192,8 +217,13 @@ class HTTPConnectionPool:
         return await self.request("GET", url, **kwargs)
 
     async def post(self, url: str, **kwargs):
-        """POST request"""
+        """POST request (``files=`` keyword enables multipart upload)"""
         return await self.request("POST", url, **kwargs)
+
+    @property
+    def client(self) -> Optional[httpx.AsyncClient]:
+        """Expose the underlying httpx client for direct multipart requests."""
+        return self._client
 
     @asynccontextmanager
     async def stream(self, method: str, url: str, **kwargs):
@@ -210,12 +240,6 @@ class HTTPConnectionPool:
             yield response
 
     def get_stats(self) -> Dict[str, Any]:
-        """
-        Get connection pool statistics.
-
-        Returns:
-            Dictionary with pool statistics
-        """
         return {
             "max_connections": self.max_connections,
             "max_keepalive": self.max_keepalive,
@@ -223,3 +247,4 @@ class HTTPConnectionPool:
             "failures": self._failures,
             "circuit_open": self._circuit_open,
         }
+
