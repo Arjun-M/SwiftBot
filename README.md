@@ -1,42 +1,43 @@
-# SwiftBot - Telegram Bot Framework
+# SwiftBot
+
 ![Banner](banner.jpg)
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-passing-green.svg)](https://github.com/Arjun-M/SwiftBot/actions)
 
-SwiftBot is an async Telegram bot framework built for simplicity and correctness. It offers typed decorators, composable filters, a middleware chain, persistent state (FSM) storage, HTTP/2 connection pooling with Telegram `Retry-After` compliance, and a full typed error hierarchy — with a complete test suite and CI.
+SwiftBot is an async framework for building Telegram bots. It pairs a handler model most people already know from Telethon with a few things the older libraries make you wire up yourself: persistent conversation state, real rate-limit handling, typed Telegram errors, and a worker pool that behaves sensibly under load. Everything runs on httpx with HTTP/2, and the core has no external dependencies beyond the HTTP client.
 
-## 🚀 Key Features
+## Features
 
-### Developer Experience
-- **Telethon-Style Decorators**: Clean, intuitive `@client.on(Message(...))` syntax
-- **Command Router with Trie**: O(m) command lookup for registered slash commands
-- **Regex Pattern Matching**: Powerful message filtering
-- **Composable Filters**: Exact-text, regex, and custom function filters
-- **Type Hints**: Full IDE support
-- **Rich Context Object**: Easy access to all update data, plus `ctx.reply()`, `ctx.answer()` shortcuts
+**Handlers and routing.** Register handlers with `@client.on(...)` and match on event type, exact text, regex, or an arbitrary predicate. Slash commands are stored in a trie, so lookup cost is proportional to the command length rather than the number of handlers.
 
-### Robustness
-- **Persistent FSM Storage**: State survives restarts — in-memory or JSON-file backends (pluggable via `BaseStorage`)
-- **Rate-Limit Compliance**: Honors Telegram `Retry-After` on 429 responses, with circuit breaker
-- **Typed Error Hierarchy**: Catch `ChatNotFound`, `TooManyRequests`, `Forbidden`, `InvalidToken`, etc.
-- **Worker Pool with Backpressure**: Bounded concurrency and a dead-letter queue for failed updates
-- **Webhook Server**: Secret-token verification, size limits, and health/metrics endpoints
-- **File Support**: `InputFile` for local uploads, plus `get_file`/`download_file` helpers
-- **HTTP/2 Connection Pooling**: Built on httpx with keep-alive connections
-- **Centralized Exception Handling** and built-in metrics
+**Conversation state that survives restarts.** Attach a storage backend (`MemoryStorage`, `JSONFileStorage`, or your own `BaseStorage` subclass) and use `ctx.set_state` / `ctx.get_state` / `ctx.clear_state` to drive multi-step conversations. State can expire automatically with `state_ttl`.
 
-## 📦 Installation
+**Rate-limit handling done properly.** When Telegram answers a request with 429, SwiftBot reads `parameters.retry_after` (or the `Retry-After` header) and waits exactly that long before retrying — no blind exponential backoff that gets accounts flagged. A circuit breaker sits in front of the connection pool for added protection.
+
+**Typed errors.** Telegram's JSON errors are mapped to a real exception hierarchy. Catch `ChatNotFound`, `Forbidden`, `TooManyRequests`, `MigrateToChat` (which carries the new supergroup id) and others instead of parsing error strings.
+
+**A worker pool with backpressure.** Updates are dispatched to a bounded pool of workers. When the queue fills, `submit` fails fast with a timeout error instead of blocking forever, and handlers that raise are preserved in a dead-letter queue with their exceptions intact, so nothing is lost and failures are retryable.
+
+**Webhooks.** A webhook server built on aiohttp with secret-token verification, request size limits, and health/metrics endpoints — tested end-to-end.
+
+**Files.** Send local files with `InputFile`, and pull files down with `get_file` / `download_file`.
+
+**Middleware.** A simple `client.use(...)` chain ships with a logger, rate limiter, admin auth, and an analytics collector, all in-memory and dependency-free.
+
+## Installation
 
 ```bash
 pip install swiftbot
 
-# Or from GitHub
+# or straight from GitHub
 pip install git+https://github.com/Arjun-M/SwiftBot.git
 ```
 
-## 🎯 Quick Start
+Requires Python 3.10 or newer.
+
+## Quick Start
 
 ```python
 import asyncio
@@ -44,167 +45,175 @@ from swiftbot import SwiftBot
 from swiftbot.types import Message
 from swiftbot.middleware import Logger, RateLimiter
 
-# Initialize bot
 client = SwiftBot(
     token="YOUR_BOT_TOKEN",
     worker_pool_size=50,
-    enable_http2=True
+    enable_http2=True,
 )
 
-# Add cache-based middleware
 client.use(Logger(level="INFO"))
 client.use(RateLimiter(rate=10, per=60))
 
-# Simple command handler
 @client.on(Message(pattern=r"^/start"))
 async def start(ctx):
-    await ctx.reply("Hello! I'm SwiftBot 🚀")
+    await ctx.reply("Hello from SwiftBot!")
 
-# Run bot
-asyncio.run(client.run())
+asyncio.run(client.run(mode="polling"))
 ```
 
-## 📖 Documentation
-
-### Client Initialization
+### A multi-step conversation
 
 ```python
 from swiftbot import SwiftBot
+from swiftbot.types import Message
+from swiftbot.storage import JSONFileStorage
 
+bot = SwiftBot(
+    token="YOUR_BOT_TOKEN",
+    storage=JSONFileStorage("state.json"),
+    state_ttl=3600,
+)
+
+@bot.on(Message(text="/start"))
+async def cmd_start(ctx):
+    await ctx.set_state({"step": "name"})
+    await ctx.reply("What's your name?")
+
+@bot.on(Message())
+async def on_text(ctx):
+    state = await ctx.get_state()
+    if state and state.get("step") == "name":
+        await ctx.set_state({"step": "done", "name": ctx.text})
+        await ctx.reply(f"Got it — {ctx.text}.")
+    elif state and state.get("step") == "done":
+        await ctx.clear_state()
+```
+
+### Handling Telegram errors by type
+
+```python
+from swiftbot.exceptions import ChatNotFound, Forbidden, TooManyRequests
+
+try:
+    await bot.send_message(chat_id, "notification")
+except ChatNotFound:
+    # chat was deleted — remove from your records
+except Forbidden:
+    # the user blocked the bot
+except TooManyRequests as exc:
+    # exc.retry_after tells you how long Telegram wants you to wait
+```
+
+## Client Reference
+
+```python
 client = SwiftBot(
     token="YOUR_BOT_TOKEN",
-    parse_mode="HTML",
-    worker_pool_size=50,
-    max_connections=100,
-    timeout=30,
-    enable_http2=True,
-    enable_centralized_exceptions=True
+    parse_mode="HTML",               # default parse mode for sends
+    worker_pool_size=50,             # concurrent handler workers
+    max_connections=100,             # HTTP connection limit
+    timeout=30,                      # request timeout in seconds
+    enable_http2=True,               # HTTP/2 multiplexing
+    enable_centralized_exceptions=True,
+    storage=JSONFileStorage("state.json"),  # optional FSM backend
+    state_ttl=3600,                           # optional state expiry
 )
 ```
 
-### Event Handlers
+Run in either mode: `client.run(mode="polling")` or `client.run(mode="webhook", url="...", secret_token="...")`.
+
+## Event Types and Filters
 
 ```python
 from swiftbot.types import Message, CallbackQuery
+from swiftbot.filters import Filters as F
 
-# Message handlers
-@client.on(Message())  # All messages
-@client.on(Message(text="hello"))  # Exact text match
-@client.on(Message(pattern=r"^/start"))  # Regex pattern
-
-# Callback query handlers
-@client.on(CallbackQuery(data="button_1"))
-@client.on(CallbackQuery(pattern=r"page_(\d+)"))
+@client.on(Message())                    # every message
+@client.on(Message(text="hello"))        # exact text
+@client.on(Message(pattern=r"^/start"))  # regex
+@client.on(Message(chat_id=[111, 222]))  # attribute filter
+@client.on(CallbackQuery(data="btn:1"))  # callback data
+@client.on(CallbackQuery(pattern=r"^page_\d+$"))
+@client.on(Message(), F.text(lambda t: len(t) > 50))
 ```
 
-### Context Object
+## Context Object
+
+Every handler receives a `Context` with the parsed update and shortcuts for the most common operations:
 
 ```python
 @client.on(Message())
 async def handler(ctx):
-    # Message data
-    ctx.text          # Message text
-    ctx.user          # Sender user object
-    ctx.chat          # Chat object
-    ctx.args          # Command arguments
-    ctx.match         # Regex match object
+    ctx.text    # message text
+    ctx.user    # sender User object
+    ctx.chat    # Chat object
+    ctx.args    # command arguments (list)
+    ctx.match   # regex Match, when a pattern matched
 
-    # Reply methods
     await ctx.reply("Text")
     await ctx.edit("New text")
     await ctx.delete()
     await ctx.forward_to(chat_id)
 ```
 
-### In-built Middleware
+## Middleware
 
 ```python
 from swiftbot.middleware import Logger, RateLimiter, Auth, AnalyticsCollector
 
-# Logging (no external dependencies)
-client.use(Logger(level="INFO", format="colored"))
-
-# Rate limiting (in-memory cache)
-client.use(RateLimiter(rate=10, per=60))
-
-# Authentication (cache-based user management)
-client.use(Auth(admin_list=[123, 456]))
-
-# Analytics (cache-based metrics)
-client.use(AnalyticsCollector(enable_real_time=True))
+client.use(Logger(level="INFO", format="text"))
+client.use(RateLimiter(rate=10, per=60))          # sliding window, in-memory
+client.use(Auth(admin_list=[123456, 789012]))     # restrict commands to admins
+client.use(AnalyticsCollector())                  # request metrics
 ```
 
-## 🏗️ Architecture
+Middleware runs as a chain around each update; write your own by subclassing `Middleware`.
 
-### Cache-Based Design
-- **No External Dependencies** for core functionality
-- **In-Memory Caching** for middleware data
-- **Automatic Cleanup** of old cache entries
-- **High Performance** without database overhead
+## Under the Hood
 
-### Connection Pool
-- HTTP/2 multiplexing for 100+ concurrent streams
-- Persistent keep-alive connections
-- Automatic connection recycling
-- Circuit breaker for fault tolerance
+**HTTP layer.** All Telegram requests go through an httpx connection pool with HTTP/2 multiplexing, keep-alive, and automatic recycling of failed connections. 429 responses respect Telegram's `retry_after` value.
 
-### Worker Pool
-- Configurable worker count
-- Bounded queue with backpressure
-- Dead-letter queue for failed updates (exceptions preserved, retryable via `retry_dead_letters()`)
-- Graceful drain on shutdown
+**Worker pool.** Updates are submitted to a bounded queue with backpressure (configurable timeout, default 5s) and a dead-letter queue that keeps failed updates with their exceptions for later inspection or retry via `retry_dead_letters()`. Workers are drained gracefully on shutdown.
 
+**Webhook server.** Built on aiohttp: 1 MB request cap, optional secret-token verification (403 on mismatch), and JSON parse errors logged and returned as 400.
 
-## 🔧 Development
+**Parsing.** Update JSON is deserialized into dataclass objects. Deeply nested `reply_to_message` chains are truncated rather than recursed infinitely, and unknown update fields are ignored gracefully.
 
-### Project Structure
+## Project Structure
 
 ```
 swiftbot/
-├── __init__.py           # Package initialization
-├── client.py             # Main SwiftBot class
-├── context.py            # Context object
-├── types.py              # Event types
-├── filters.py            # Filter system
-├── storage.py            # FSM storage backends (memory + JSON file)
-├── router.py             # Command router
+├── __init__.py           # package exports
+├── client.py             # SwiftBot client
+├── context.py            # Context object and FSM helpers
+├── types.py              # Message / CallbackQuery / event types
+├── filters.py            # filter system and CommandFilter
+├── storage.py            # BaseStorage, MemoryStorage, JSONFileStorage
+├── router.py             # trie-based command router
+├── update_types.py       # Telegram API object parsing
 ├── webhook/              # aiohttp webhook server
-├── exceptions/           # Exception handling
-│   ├── base.py
-│   ├── handlers.py
-│   ├── api.py
-│   └── telegram.py     # Typed Telegram error hierarchy
-├── middleware/           # Logger, RateLimiter, Auth, AnalyticsCollector
-│   ├── base.py
-│   ├── logger.py
-│   ├── rate_limiter.py
-│   ├── auth.py
-│   └── analytics.py
-└── examples/             # Example bots
-    └── basic_bot.py
+├── exceptions/           # typed Telegram error hierarchy
+└── middleware/           # Logger, RateLimiter, Auth, AnalyticsCollector
 
-Tests live in `tests/` and run via CI on every push.
+tests/        # test suite (pytest)
+examples/     # working example bots
 ```
 
-## 🎯 Use Cases
+## Development
 
-- ✅ **Lightweight bots** without external dependencies
-- ✅ **High-performance applications** needing speed
-- ✅ **Serverless deployments** with minimal footprint
-- ✅ **Development environments** with quick setup
-- ✅ **Educational projects** learning bot development
+```bash
+git clone https://github.com/Arjun-M/SwiftBot.git
+cd SwiftBot
+pip install -e ".[dev]"
+python -m pytest
+```
 
-## 🤝 Contributing
+Pull requests are welcome — and appreciated. If you find a bug, an issue with a way to reproduce it will get a fix faster than a description alone.
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## License
 
-## 📄 License
+MIT — Copyright (c) 2025 Arjun-M/SwiftBot
 
-MIT License - Copyright (c) 2025 Arjun-M/SwiftBot
+## Acknowledgments
 
-## 🙏 Acknowledgments
-
-- Inspired by [Telethon](https://github.com/LonamiWebs/Telethon) Syntax
-- Built on [httpx](https://www.python-httpx.org/) for HTTP/2
-
----
+The handler syntax is inspired by [Telethon](https://github.com/LonamiWebs/Telethon); the HTTP layer is built on [httpx](https://www.python-httpx.org/).
