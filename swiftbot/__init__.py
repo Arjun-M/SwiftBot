@@ -7,7 +7,7 @@ A blazing-fast Telegram bot framework with Telethon-inspired syntax,
 30× faster routing, enterprise-grade middleware, and HTTP/2 connection pooling.
 """
 
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 __author__ = "Arjun-M"
 __license__ = "MIT"
 

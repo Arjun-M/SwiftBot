@@ -1,32 +1,31 @@
-# SwiftBot - Ultra-Fast Telegram Bot Client
+# SwiftBot - Telegram Bot Framework
 ![Banner](banner.jpg)
 
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-passing-green.svg)](https://github.com/Arjun-M/SwiftBot/actions)
 
-SwiftBot is a blazing-fast Telegram bot framework built for performance and simplicity. With 30× faster command routing, HTTP/2 connection pooling, and zero external dependencies for core functionality.
+SwiftBot is an async Telegram bot framework built for simplicity and correctness. It offers typed decorators, composable filters, a middleware chain, persistent state (FSM) storage, HTTP/2 connection pooling with Telegram `Retry-After` compliance, and a full typed error hierarchy — with a complete test suite and CI.
 
 ## 🚀 Key Features
 
-### Performance
-- **30× Faster Routing**: Trie-based O(m) command lookup vs O(n) linear search
-- **HTTP/2 Multiplexing**: 100+ concurrent requests per connection
-- **Connection Pooling**: 50-100 persistent keep-alive connections
-- **Worker Pool**: 50+ concurrent update processing workers
-- **Circuit Breaker**: Automatic failure recovery
-
 ### Developer Experience
-- **Telethon-Style Decorators**: Clean, intuitive syntax
+- **Telethon-Style Decorators**: Clean, intuitive `@client.on(Message(...))` syntax
+- **Command Router with Trie**: O(m) command lookup for registered slash commands
 - **Regex Pattern Matching**: Powerful message filtering
-- **Composable Filters**: `F.text & F.private & ~F.forwarded`
+- **Composable Filters**: Exact-text, regex, and custom function filters
 - **Type Hints**: Full IDE support
-- **Rich Context Object**: Easy access to all update data
+- **Rich Context Object**: Easy access to all update data, plus `ctx.reply()`, `ctx.answer()` shortcuts
 
-### Enterprise Features
-- **Cache-Based Middleware**: No external dependencies
-- **Centralized Exception Handling**: Comprehensive error recovery
-- **Performance Monitoring**: Built-in metrics
-- **Zero Dependencies**: Core functionality without external storage
+### Robustness
+- **Persistent FSM Storage**: State survives restarts — in-memory or JSON-file backends (pluggable via `BaseStorage`)
+- **Rate-Limit Compliance**: Honors Telegram `Retry-After` on 429 responses, with circuit breaker
+- **Typed Error Hierarchy**: Catch `ChatNotFound`, `TooManyRequests`, `Forbidden`, `InvalidToken`, etc.
+- **Worker Pool with Backpressure**: Bounded concurrency and a dead-letter queue for failed updates
+- **Webhook Server**: Secret-token verification, size limits, and health/metrics endpoints
+- **File Support**: `InputFile` for local uploads, plus `get_file`/`download_file` helpers
+- **HTTP/2 Connection Pooling**: Built on httpx with keep-alive connections
+- **Centralized Exception Handling** and built-in metrics
 
 ## 📦 Installation
 
@@ -150,21 +149,11 @@ client.use(AnalyticsCollector(enable_real_time=True))
 - Circuit breaker for fault tolerance
 
 ### Worker Pool
-- Configurable worker count (10-100)
-- Priority queue for updates
-- Backpressure handling
-- Load balancing
+- Configurable worker count
+- Bounded queue with backpressure
+- Dead-letter queue for failed updates (exceptions preserved, retryable via `retry_dead_letters()`)
+- Graceful drain on shutdown
 
-## 📊 Performance Comparison
-
-| Feature | SwiftBot v1.0.3 | python-telegram-bot | aiogram |
-|---------|-----------------|---------------------|---------|
-| Command Routing | O(m) Trie | O(n) Linear | O(n) Linear |
-| HTTP/2 | ✅ Yes | ❌ No | ❌ No |
-| Memory Usage | 🟢 Low | 🟡 Medium | 🟡 Medium |
-| Throughput | 1000+ msg/s | ~100 msg/s | ~200 msg/s |
-
-_(i) Based on analysis by an external ai model_
 
 ## 🔧 Development
 
@@ -177,11 +166,15 @@ swiftbot/
 ├── context.py            # Context object
 ├── types.py              # Event types
 ├── filters.py            # Filter system
+├── storage.py            # FSM storage backends (memory + JSON file)
+├── router.py             # Command router
+├── webhook/              # aiohttp webhook server
 ├── exceptions/           # Exception handling
 │   ├── base.py
 │   ├── handlers.py
-│   └── api.py
-├── middleware/           # Cache-based middleware
+│   ├── api.py
+│   └── telegram.py     # Typed Telegram error hierarchy
+├── middleware/           # Logger, RateLimiter, Auth, AnalyticsCollector
 │   ├── base.py
 │   ├── logger.py
 │   ├── rate_limiter.py
@@ -189,6 +182,8 @@ swiftbot/
 │   └── analytics.py
 └── examples/             # Example bots
     └── basic_bot.py
+
+Tests live in `tests/` and run via CI on every push.
 ```
 
 ## 🎯 Use Cases

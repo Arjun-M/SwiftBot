@@ -13,10 +13,10 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="swiftbot",
-    version="1.0.2",
+    version="1.1.0",
     author="Arjun-M",
     author_email="",
-    description="Ultra-fast Telegram bot framework with 30× faster routing & consume 20-30% less memory",
+    description="Async Telegram bot framework with typed decorators, composable filters, persistent FSM storage and a typed error hierarchy",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/Arjun-M/SwiftBot",
@@ -37,10 +37,10 @@ setup(
     python_requires=">=3.10",
     install_requires=requirements,
     extras_require={
-        "webhook": ["uvicorn>=0.23.0,<0.26.0"],
         "dev": [
-            "pytest>=7.4.0,<8.0.0",
-            "pytest-asyncio>=0.21.0,<0.22.0",
+            "pytest>=7.4.0",
+            "pytest-asyncio>=0.21.0",
+            "aiohttp>=3.10",
         ]
     },
 )

@@ -10,7 +10,17 @@ from .update_types import Update, Message as MessageType, User, Chat
 
 logger = logging.getLogger(__name__)
 
+
 class MemoryStorage:
+    """
+    Deprecated per-context memory storage kept for backward compatibility.
+
+    WARNING: data stored here lives only for the lifetime of one handler
+    invocation. Use the client-level persistent storage (``ctx.storage`` /
+    ``ctx.bot.storage``) for data that must survive across updates — including
+    FSM state.
+    """
+
     def __init__(self):
         self.data = {}
 
@@ -22,6 +32,34 @@ class MemoryStorage:
 
     async def delete(self, key):
         self.data.pop(key, None)
+
+
+class StorageProxy:
+    """
+    Convenience wrapper around the client-level storage backend.
+
+    Stores user/chat data under namespaced keys (e.g. ``"user:12345:data"``)
+    so it persists across updates and restarts when a persistent backend
+    (``JSONFileStorage``) is configured.
+    """
+
+    def __init__(self, storage, namespace: str, prefix_id):
+        self._storage = storage
+        self._namespace = namespace
+        self._prefix_id = prefix_id
+
+    def _key(self, key: str) -> str:
+        return f"{self._prefix_id}:{key}"
+
+    async def set(self, key, value):
+        return await self._storage.set(self._namespace, self._key(key), value)
+
+    async def get(self, key):
+        return await self._storage.get(self._namespace, self._key(key))
+
+    async def delete(self, key):
+        return await self._storage.delete(self._namespace, self._key(key))
+
 
 class Context:
     """
@@ -100,9 +138,16 @@ class Context:
         # Middleware data storage
         self.middleware_data: Dict[str, Any] = {}
 
+        # Legacy per-context scratch storage (survives one handler only)
         self.user_data = MemoryStorage()
         self.chat_data = MemoryStorage()
         self.state = None
+
+        # Client-level persistent storage (survives updates and restarts)
+        self.storage = self._persistent_storage()
+        self.user_storage = StorageProxy(self.bot.storage, "user", self.user.id) if self.user else None
+        self.chat_storage = StorageProxy(self.bot.storage, "chat", self.chat.id) if self.chat else None
+        self._state_manager = getattr(self.bot, "_state_manager", None)
 
     def _extract_common_fields(self, update_obj):
         """Extract common fields from update object with robust error handling"""
@@ -460,32 +505,73 @@ class Context:
     # State Management (FSM)
     # ===================
 
+    def _persistent_storage(self):
+        """Resolve the client-level storage backend, defaulting to memory."""
+        storage = getattr(self.bot, "storage", None)
+        if storage is None:
+            # Fall back to in-memory storage so ``ctx.storage`` is always usable
+            from .storage import MemoryStorage
+            storage = MemoryStorage()
+        return storage
+
     async def set_state(self, state):
-        """Set user state for FSM (Finite State Machine)"""
-        if self.user_data:
+        """
+        Set user state for FSM (Finite State Machine).
+
+        With a persistent storage backend (e.g. ``JSONFileStorage``) configured
+        on the client, state now survives across updates and restarts —
+        enabling genuine multi-step conversations.
+        """
+        user_id = self.user.id if self.user else None
+        if user_id is None:
+            logger.warning("set_state called without an identified user")
+            return
+
+        if self._state_manager:
             try:
-                await self.user_data.set("state", state)
-                self.state = state
+                await self._state_manager.set_state(user_id, state)
             except Exception as e:
                 logger.error(f"Error setting state: {e}")
+        else:
+            await self.user_data.set("state", state)
+        self.state = state
 
     async def get_state(self):
-        """Get current user state"""
-        if self.user_data:
+        """
+        Get current user state.
+
+        ``set_state`` always updates the local cache, so the persistent layer
+        is only consulted when the local state has not been set in this context.
+        """
+        if self.state is not None:
+            return self.state
+
+        user_id = self.user.id if self.user else None
+        if user_id is None:
+            return None
+
+        if self._state_manager:
             try:
-                self.state = await self.user_data.get("state")
-                return self.state
+                self.state = await self._state_manager.get_state(user_id)
             except Exception as e:
                 logger.error(f"Error getting state: {e}")
-        return None
+        else:
+            self.state = await self.user_data.get("state")
+        return self.state
 
     async def clear_state(self):
-        """Clear user state"""
-        if self.user_data:
+        """Clear user state (in the persistent backend, if configured)."""
+        user_id = self.user.id if self.user else None
+        if user_id is None:
+            return
+
+        if self._state_manager:
             try:
-                await self.user_data.delete("state")
-                self.state = None
+                await self._state_manager.clear_state(user_id)
             except Exception as e:
                 logger.error(f"Error clearing state: {e}")
+        else:
+            await self.user_data.delete("state")
+        self.state = None
 
     

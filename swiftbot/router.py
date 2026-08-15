@@ -8,8 +8,6 @@ import re
 import logging
 from typing import Dict, List, Callable, Optional, Any, Tuple
 from collections import defaultdict
-from functools import lru_cache
-
 # Set up logger
 logger = logging.getLogger(__name__)
 
@@ -126,7 +124,7 @@ class CommandRouter:
         self.edited_message_handlers: List[Tuple] = []
         self.other_handlers: Dict[str, List[Tuple]] = defaultdict(list)
 
-        # Performance optimizations
+        # Thread-safe regex compilation cache used during matching.
         self._compiled_patterns_cache: Dict[str, re.Pattern] = {}
         self._handler_stats = {
             'commands_processed': 0,
@@ -189,11 +187,14 @@ class CommandRouter:
             logger.error(f"Error adding handler: {e}")
             raise
 
-    @lru_cache(maxsize=1000)
     def _get_compiled_pattern(self, pattern_str: str) -> re.Pattern:
         """
-        Get compiled regex pattern with LRU caching.
+        Get compiled regex pattern with caching.
         Avoids recompiling frequently used patterns.
+
+        NOTE: Previously this method was decorated with ``@lru_cache`` but was
+        never actually called during routing — the cache stats always reported
+        zero. It is now used by ``route()`` for regex matching.
         """
         try:
             if pattern_str not in self._compiled_patterns_cache:
@@ -253,6 +254,10 @@ class CommandRouter:
                         match_obj = match_result if isinstance(match_result, re.Match) else None
                         logger.debug(f"Handler matched for {update_type} with priority {priority}")
                         return handler, match_obj, event_type
+
+                except re.error as e:
+                    logger.error(f"Invalid regex pattern: {e}")
+                    continue
 
                 except Exception as e:
                     logger.error(f"Error in handler matching: {e}")

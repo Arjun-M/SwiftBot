@@ -104,7 +104,6 @@ class Chat:
             join_by_request=data.get('join_by_request'),
             description=data.get('description'),
             invite_link=data.get('invite_link'),
-            pinned_message=None,  # TODO: Handle recursive Message
             permissions=data.get('permissions'),
             slow_mode_delay=data.get('slow_mode_delay'),
             message_auto_delete_time=data.get('message_auto_delete_time'),
@@ -115,7 +114,11 @@ class Chat:
             can_set_sticker_set=data.get('can_set_sticker_set'),
             linked_chat_id=data.get('linked_chat_id'),
             location=data.get('location'),
-        )
+            pinned_message=(
+                Message.from_dict(data['pinned_message'], _depth=0)
+                if isinstance(data.get('pinned_message'), dict) else None
+            ),
+        )  # pinned_message depth-guarded by Message.from_dict(_depth=0)
 
 
 @dataclass
@@ -196,10 +199,28 @@ class Message:
     reply_markup: Optional[Dict] = None
 
     @classmethod
-    def from_dict(cls, data: Optional[Dict]) -> Optional['Message']:
-        """Create Message from dictionary"""
+    def from_dict(cls, data: Optional[Dict], _depth: int = 0) -> Optional['Message']:
+        """
+        Create Message from dictionary.
+
+        ``_depth`` guards against unbounded recursion when parsing deeply
+        nested ``reply_to_message`` / ``pinned_message`` chains (e.g. crafted
+        payloads). Chains deeper than 100 levels are truncated to None.
+        """
         if not data:
             return None
+
+        if _depth > 100:
+            # Truncate arbitrarily deep reply/pinned chains to prevent
+            # stack exhaustion while still exposing the message basics.
+            return cls(
+                message_id=data.get('message_id'),
+                date=data.get('date'),
+                chat=Chat.from_dict(data.get('chat')),
+                from_user=User.from_dict(data.get('from')),
+                text=data.get('text'),
+                caption=data.get('caption'),
+            )
 
         return cls(
             message_id=data.get('message_id'),
@@ -215,7 +236,7 @@ class Message:
             forward_date=data.get('forward_date'),
             is_topic_message=data.get('is_topic_message'),
             is_automatic_forward=data.get('is_automatic_forward'),
-            reply_to_message=cls.from_dict(data.get('reply_to_message')),
+            reply_to_message=cls.from_dict(data.get('reply_to_message'), _depth=_depth + 1),
             via_bot=User.from_dict(data.get('via_bot')),
             edit_date=data.get('edit_date'),
             has_protected_content=data.get('has_protected_content'),
@@ -251,7 +272,7 @@ class Message:
             message_auto_delete_timer_changed=data.get('message_auto_delete_timer_changed'),
             migrate_to_chat_id=data.get('migrate_to_chat_id'),
             migrate_from_chat_id=data.get('migrate_from_chat_id'),
-            pinned_message=cls.from_dict(data.get('pinned_message')),
+            pinned_message=cls.from_dict(data.get('pinned_message'), _depth=_depth + 1),
             invoice=data.get('invoice'),
             successful_payment=data.get('successful_payment'),
             user_shared=data.get('user_shared'),
@@ -543,6 +564,8 @@ class Update:
         Create Update from dictionary.
         Parses all update types and stores raw data.
         """
+        if data is None:
+            return None
         return cls(
             update_id=data.get('update_id', 0),
             message=Message.from_dict(data.get('message')),

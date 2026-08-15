@@ -246,9 +246,11 @@ class MediaFilter(Filter):
 
 class CommandFilter(Filter):
     """
-    Filters command messages.
-    Supports single command or list of commands.
-    Enhanced with better command parsing.
+    Filters command messages with proper validation.
+
+    - Accepts a single command or a list of commands
+    - Case-insensitive matching, ignores ``@bot`` suffixes
+    - Validates inputs (non-strings are skipped; empty lists raise)
     """
 
     def __init__(self, commands: Union[str, List[str]]):
@@ -258,9 +260,22 @@ class CommandFilter(Filter):
         """
         if isinstance(commands, str):
             commands = [commands]
-        # Normalize commands - ensure they start with /
-        self.commands = [f'/{cmd}' if not cmd.startswith('/') else cmd for cmd in commands]
-        # Store lowercase versions for case-insensitive matching
+
+        # Validate commands
+        validated_commands = []
+        for cmd in commands:
+            if not isinstance(cmd, str):
+                logger.warning(f"Skipping non-string command: {cmd}")
+                continue
+            # Ensure command starts with /
+            if not cmd.startswith('/'):
+                cmd = '/' + cmd
+            validated_commands.append(cmd)
+
+        if not validated_commands:
+            raise ValueError("At least one valid command string required")
+
+        self.commands = validated_commands
         self.commands_lower = [cmd.lower() for cmd in self.commands]
 
     def __call__(self, message):
@@ -276,7 +291,8 @@ class CommandFilter(Filter):
             command_part = text.split()[0].split('@')[0].lower()
 
             return command_part in self.commands_lower
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error in CommandFilter: {e}")
             return False
 
 
@@ -331,49 +347,6 @@ class CaptionRegexFilter(Filter):
         except Exception:
             return False
 
-
-class CommandFilter(Filter):
-    """
-    Filters command messages with proper validation.
-    BUG FIX: Added input validation for command strings
-    """
-    def __init__(self, commands: Union[str, List[str]]):
-        if isinstance(commands, str):
-            commands = [commands]
-        
-        # Validate commands
-        validated_commands = []
-        for cmd in commands:
-            if not isinstance(cmd, str):
-                logger.warning(f"Skipping non-string command: {cmd}")
-                continue
-            # Ensure command starts with /
-            if not cmd.startswith('/'):
-                cmd = '/' + cmd
-            validated_commands.append(cmd)
-        
-        if not validated_commands:
-            raise ValueError("At least one valid command string required")
-        
-        self.commands = validated_commands
-        self.commands_lower = [cmd.lower() for cmd in self.commands]
-
-    def __call__(self, message):
-        try:
-            if not hasattr(message, 'text') or not message.text:
-                return False
-
-            text = message.text.strip()
-            if not text.startswith('/'):
-                return False
-
-            # Extract command part (before space and @)
-            command_part = text.split()[0].split('@')[0].lower()
-
-            return command_part in self.commands_lower
-        except Exception as e:
-            logger.error(f"Error in CommandFilter: {e}")
-            return False
 
 class UserFilter(Filter):
     """
@@ -464,12 +437,12 @@ class Filters:
     Enhanced with better integration and additional filters.
 
     Example usage:
-        from SwiftBot.filters import Filters as F
+        from swiftbot.filters import Filters as F
 
         @client.on(Message(F.text & F.private))
         @client.on(Message(F.photo | F.video))
         @client.on(Message(F.command("start")))
-        @client.on(Message(F.regex(r"^\d+$")))
+        @client.on(Message(F.regex(r"^\\d+$")))
 
     Copyright (c) 2025 Arjun-M/SwiftBot
     """
