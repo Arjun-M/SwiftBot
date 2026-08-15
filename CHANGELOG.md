@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.4.0] — 2026-08-15
+
+### Added
+- **Testing harness (`swiftbot.testing`)**: `FakePool` records every outgoing API call (method + params), can be scripted with success payloads or Telegram errors, and supports a global hook; `TestClient` is an async context manager that runs a bot against the fake — handlers execute through the real worker pool, router, filters, middleware and FSM storage, minus the network. See `docs` / the module docstring for usage.
+- **CallbackData (`swiftbot.callback_data`)**: type-safe callback payload factory (`CallbackData("nav", str, int)`) with `pack`/`unpack`, an optional `filter()` for registering handlers, `CallbackDataInvalid` for malformed payloads, and automatic 64-byte guard enforcement.
+- **Deep linking (`swiftbot.deep_linking`)**: `create_start_link()`, `encode_payload()` (str / bytes / dict), `decode_payload()`, and `parse_start_param()` covering the full `?start=...` deep-linking flow.
+- **Typed Bot API models (`swiftbot.models`)**: `User`, `Chat`, `Message`, `CallbackQuery`, `InlineKeyboardMarkup`, `Document`, `MessageEntity`, `PhotoSize` with tolerant `from_dict()`/`to_dict()` and `raw` passthrough — unknown future fields never break parsing.
+- **RedisStorage (`swiftbot.storage`)**: drop-in `RedisStorage` (lazy `redis` import with a clear error if uninstalled) alongside `MemoryStorage` and `JSONFileStorage`; `StateManager` supports per-key TTL.
+- **Proxy support**: `SwiftBot(proxy="...")` wires a proxy URL (http/https/socks5) through the HTTP connection pool.
+- **Bot API 2026 (9.6–10.2)**: 11 new API methods (`getManagedBotToken`, `replaceManagedBotToken`, `answerGuestQuery`, `sendLivePhoto`, `deleteAllMessageReactions`, `sendRichMessage`, `sendRichMessageDraft`, `editMessageText` rich variant, `deleteEphemeralMessage`, `answerChatJoinRequestQuery`, `sendChatJoinRequestWebApp`) and 9 new update kinds (`managed_bot_created/updated`, `bot_subscription_updated`, `guest_message`, `business_message`, `edited_business_message`, `deleted_business_messages`, `purchase`).
+- **50 new tests** covering every v1.2–v1.4 feature; the full suite is 83 tests, all green.
+
+### Fixed
+- **Duplicate API internals**: the API module had a second `__init__`/`_request` pair that shadowed the multipart-upload-capable original — every request that used `InputFile` silently lost its file payload, and errors were raised as bare `Exception` instead of typed `TelegramError` subclasses. The duplicate was removed; all requests now go through the single correct implementation.
+- **`filters=` alias**: `Message(filters=CommandFilter(...))` now works as the conventional alias for `filter_func=`.
+- **Collection noise**: pytest collection configuration now excludes the public `TestClient` class from being mistaken for a test suite.
+
+### Changed
+- Version bumped to **1.4.0**.
+
 ## [1.1.0] — 2026-08-15
 
 ### Fixed

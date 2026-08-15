@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-passing-green.svg)](https://github.com/Arjun-M/SwiftBot/actions)
 
-SwiftBot is an async Telegram bot framework built for simplicity and correctness. It offers typed decorators, composable filters, a middleware chain, persistent state (FSM) storage, HTTP/2 connection pooling with Telegram `Retry-After` compliance, and a full typed error hierarchy — with a complete test suite and CI.
+SwiftBot is an async Telegram bot framework built for simplicity and correctness. It offers typed decorators, composable filters, a middleware chain, persistent state (FSM) storage, HTTP/2 connection pooling with Telegram `Retry-After` compliance, and a full typed error hierarchy — plus a built-in testing harness, typed Bot API models, deep-linking utilities, Redis storage, proxy support, and up-to-date Bot API 2026 coverage.
 
 ## 🚀 Key Features
 
@@ -18,13 +18,19 @@ SwiftBot is an async Telegram bot framework built for simplicity and correctness
 - **Rich Context Object**: Easy access to all update data, plus `ctx.reply()`, `ctx.answer()` shortcuts
 
 ### Robustness
-- **Persistent FSM Storage**: State survives restarts — in-memory or JSON-file backends (pluggable via `BaseStorage`)
+- **Persistent FSM Storage**: State survives restarts — in-memory, JSON-file, or Redis backends (pluggable via `BaseStorage`, with per-key TTL via `StateManager`)
+- **Testing Harness**: `FakePool` + `TestClient` let you run handlers against the real router, worker pool, filters and middleware with zero network calls — every outgoing API request is recorded and responses are scriptable
+- **Typed Models**: `User`, `Chat`, `Message`, `CallbackQuery`, `InlineKeyboardMarkup`, `Document` with tolerant `from_dict`/`to_dict`
+- **CallbackData**: Type-safe typed callback payloads with `pack`/`unpack` and a 64-byte guard
+- **Deep Linking**: `create_start_link`, `encode_payload`, `decode_payload`, `parse_start_param`
+- **Bot API 2026**: New methods (managed bots, guest mode, rich messages, live photos, ephemeral messages) and new update kinds (business messages, purchases)
 - **Rate-Limit Compliance**: Honors Telegram `Retry-After` on 429 responses, with circuit breaker
 - **Typed Error Hierarchy**: Catch `ChatNotFound`, `TooManyRequests`, `Forbidden`, `InvalidToken`, etc.
 - **Worker Pool with Backpressure**: Bounded concurrency and a dead-letter queue for failed updates
 - **Webhook Server**: Secret-token verification, size limits, and health/metrics endpoints
 - **File Support**: `InputFile` for local uploads, plus `get_file`/`download_file` helpers
 - **HTTP/2 Connection Pooling**: Built on httpx with keep-alive connections
+- **Proxy Support**: `SwiftBot(proxy="http/https/socks5://...")` routes all API traffic through a proxy
 - **Centralized Exception Handling** and built-in metrics
 
 ## 📦 Installation
@@ -193,6 +199,55 @@ Tests live in `tests/` and run via CI on every push.
 - ✅ **Serverless deployments** with minimal footprint
 - ✅ **Development environments** with quick setup
 - ✅ **Educational projects** learning bot development
+
+## 🧪 Testing Your Bot
+
+The built-in harness runs your handlers end to end without a single network call:
+
+```python
+import pytest
+from swiftbot import SwiftBot
+from swiftbot.testing import TestClient
+from swiftbot.types import Message
+from swiftbot.filters import Command
+
+bot = SwiftBot(token="0000000000:TEST")
+
+@bot.on(Message(text=Command("start")))
+async def start(ctx):
+    await ctx.reply("Hello!")
+
+async def test_start_handler():
+    async with TestClient(bot) as client:
+        await client.send_update({
+            "update_id": 1,
+            "message": {
+                "message_id": 1, "date": 1000,
+                "chat": {"id": 42, "type": "private"},
+                "from": {"id": 7, "is_bot": False, "first_name": "Tester"},
+                "text": "/start",
+            },
+        })
+
+    assert client.outgoing[0]["method"] == "sendMessage"
+    assert client.outgoing[0]["params"]["text"] == "Hello!"
+    assert client.outgoing[0]["params"]["chat_id"] == 42
+```
+
+`FakePool.script("methodName", result=...)` and `FakePool.script("methodName", error={"error_code": 400, "description": "..."})` let you drive any API response, and the pool records every outgoing call with method and params.
+
+## 🆕 What's New in 1.4.0
+
+| Module | What it gives you |
+| --- | --- |
+| `swiftbot.testing` | `FakePool` + `TestClient` — network-free handler tests |
+| `swiftbot.callback_data` | Typed callback payloads (`pack`/`unpack`/`filter`) |
+| `swiftbot.deep_linking` | Deep-link creation and payload encode/decode |
+| `swiftbot.models` | Typed `User`/`Chat`/`Message`/`CallbackQuery`/`Document` models |
+| `swiftbot.storage` | `RedisStorage` alongside `MemoryStorage`/`JSONFileStorage` |
+| `swiftbot.connection.pool` | Proxy support (`SwiftBot(proxy=...)`) |
+| `swiftbot.api.telegram` | 11 Bot API 2026 methods (managed bots, guest mode, rich messages, live photos, ephemeral messages) |
+| `swiftbot.update_types` | 9 new update kinds (business messages, guest messages, purchases) |
 
 ## 🤝 Contributing
 

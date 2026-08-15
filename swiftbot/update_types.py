@@ -554,6 +554,15 @@ class Update:
     my_chat_member: Optional[ChatMemberUpdated] = None
     chat_member: Optional[ChatMemberUpdated] = None
     chat_join_request: Optional[ChatJoinRequest] = None
+    # Bot API 2026 additions (9.6 / 10.0 / 10.2)
+    managed_bot_created: Optional[Dict] = None
+    managed_bot_updated: Optional[Dict] = None
+    bot_subscription_updated: Optional[Dict] = None
+    guest_message: Optional[Message] = None
+    business_message: Optional[Message] = None
+    edited_business_message: Optional[Message] = None
+    deleted_business_messages: Optional[Dict] = None
+    purchase: Optional[Dict] = None
 
     # Raw JSON data
     raw: Optional[Dict] = None
@@ -582,6 +591,16 @@ class Update:
             my_chat_member=ChatMemberUpdated.from_dict(data.get('my_chat_member')),
             chat_member=ChatMemberUpdated.from_dict(data.get('chat_member')),
             chat_join_request=ChatJoinRequest.from_dict(data.get('chat_join_request')),
+            # Bot API 2026 additions — parseable fields become typed objects,
+            # everything else stays as a dict via ``raw``.
+            managed_bot_created=data.get('managed_bot_created'),
+            managed_bot_updated=data.get('managed_bot_updated'),
+            bot_subscription_updated=data.get('bot_subscription_updated'),
+            guest_message=Message.from_dict(data.get('guest_message')),
+            business_message=Message.from_dict(data.get('business_message')),
+            edited_business_message=Message.from_dict(data.get('edited_business_message')),
+            deleted_business_messages=data.get('deleted_business_messages'),
+            purchase=data.get('purchase'),
             raw=data,  # Store raw JSON
         )
 
@@ -615,6 +634,22 @@ class Update:
             return 'chat_member'
         elif self.chat_join_request:
             return 'chat_join_request'
+        elif self.managed_bot_created:
+            return 'managed_bot_created'
+        elif self.managed_bot_updated:
+            return 'managed_bot_updated'
+        elif self.bot_subscription_updated:
+            return 'bot_subscription_updated'
+        elif self.guest_message:
+            return 'guest_message'
+        elif self.business_message:
+            return 'business_message'
+        elif self.edited_business_message:
+            return 'edited_business_message'
+        elif self.deleted_business_messages:
+            return 'deleted_business_messages'
+        elif self.purchase:
+            return 'purchase'
         return None
 
     def get_update_object(self):

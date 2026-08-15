@@ -99,7 +99,7 @@ class TelegramAPI:
 
         Raises:
             TelegramError: Typed subclass matching the Telegram error
-                (e.g. ``RetryAfterError``, ``BadRequestError``)
+                (e.g. ``TooManyRequests``, ``ChatNotFound``)
         """
         url = f"{self.base_url}/{method}"
 
@@ -126,112 +126,6 @@ class TelegramAPI:
 
         if not data.get('ok'):
             raise TelegramError.from_response(data)
-
-        return data.get('result')
-
-    # ==========================================
-    # Files
-    # ==========================================
-
-    async def get_file(self, file_id: str) -> Dict:
-        """
-        Get basic info about a file and prepare it for download.
-
-        Args:
-            file_id: File identifier to get info about
-
-        Returns:
-            Dict with ``file_path`` and other file info
-        """
-        return await self._request("getFile", file_id=file_id)
-
-    async def download_file(self, file_id: str) -> bytes:
-        """
-        Download a file from Telegram by its ``file_id``.
-
-        Args:
-            file_id: File identifier to download
-
-        Returns:
-            Raw file bytes
-        """
-        info = await self.get_file(file_id)
-        file_path = info.get("file_path")
-        if not file_path:
-            raise TelegramError.from_response({
-                "ok": False, "error_code": 400,
-                "description": f"No file_path in getFile response: {info}",
-            })
-        # Download from the file endpoint using the same base URL so local
-        # Bot API servers (e.g. in Telegram-Test environments) are supported.
-        url = f"{self.base_url}/{file_path}"
-        response = await self.pool.get(url)
-        return response.content
-
-    """
-    Complete Telegram Bot API implementation with ALL methods.
-
-    Covers:
-    - Getting Updates
-    - Sending Messages (text, media, files)
-    - Editing & Deleting
-    - Inline Mode
-    - Callback Queries
-    - Chat Management
-    - User Management
-    - Stickers
-    - Payments
-    - Games
-    - Forum Topics
-    - And more...
-
-    Copyright (c) 2025 Arjun-M/SwiftBot
-    """
-
-    def __init__(self, token: str, connection_pool, base_url: str = "https://api.telegram.org"):
-        """
-        Initialize Telegram API wrapper.
-
-        Args:
-            token: Bot token from @BotFather
-            connection_pool: HTTP connection pool
-            base_url: API base URL
-        """
-        self.token = token
-        self.pool = connection_pool
-        self.base_url = f"{base_url}/bot{token}"
-
-    async def _request(self, method: str, **params) -> Any:
-        """
-        Make API request with automatic error handling.
-
-        Args:
-            method: API method name
-            **params: Method parameters
-
-        Returns:
-            API response result
-
-        Raises:
-            Exception: If API returns error
-        """
-        url = f"{self.base_url}/{method}"
-
-        # Remove None values
-        params = {k: v for k, v in params.items() if v is not None}
-
-        # Convert objects to JSON
-        for key, value in params.items():
-            if isinstance(value, (dict, list)):
-                params[key] = json.dumps(value)
-
-        response = await self.pool.post(url, json=params)
-        data = response.json()
-
-        if not data.get('ok'):
-            error_code = data.get('error_code', 'unknown')
-            description = data.get('description', 'No description')
-            raise Exception(f"Telegram API error {error_code}: {description}")
 
         return data.get('result')
 
@@ -2114,3 +2008,236 @@ class TelegramAPI:
             offset=offset,
             limit=limit,
         )
+
+    # ==========================================
+    # Bot API 2026 (versions 9.6 - 10.2)
+    # ==========================================
+
+    # ---------- Managed Bots (Bot API 9.6) ----------
+
+    async def get_managed_bot_token(self, managed_bot_token_request_id: str):
+        """
+        Get a token for a managed bot (Bot API 9.6, April 2026).
+
+        Returns a ``ManagedBotToken`` object containing the bot token that
+        can be used with this bot token for the managed bot.
+        """
+        return await self._request(
+            "getManagedBotToken",
+            managed_bot_token_request_id=managed_bot_token_request_id,
+        )
+
+    async def replace_managed_bot_token(self, managed_bot_token_request_id: str):
+        """
+        Replace the token for a managed bot (Bot API 9.6, April 2026).
+        """
+        return await self._request(
+            "replaceManagedBotToken",
+            managed_bot_token_request_id=managed_bot_token_request_id,
+        )
+
+    # ---------- Guest Mode (Bot API 10.0) ----------
+
+    async def answer_guest_query(
+        self,
+        guest_query_id: str,
+        message: Optional[Dict] = None,
+    ):
+        """
+        Answer a guest query in Guest Mode (Bot API 10.0, May 2026).
+
+        Args:
+            guest_query_id: Unique identifier for the query to answer
+            message: Message to send to the guest (see GuestModeMessage format)
+        """
+        params: Dict[str, Any] = {"guest_query_id": guest_query_id}
+        if message is not None:
+            params["message"] = message
+        return await self._request("answerGuestQuery", **params)
+
+    async def send_live_photo(
+        self,
+        chat_id: Union[int, str],
+        video: Optional[Any] = None,
+        thumbnail: Optional[Any] = None,
+        duration: Optional[int] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        caption: Optional[str] = None,
+        caption_parse_mode: Optional[str] = None,
+        caption_entities: Optional[List[Dict]] = None,
+        show_caption_above_media: Optional[bool] = None,
+        has_spoiler: Optional[bool] = None,
+        disable_notification: Optional[bool] = None,
+        protect_content: Optional[bool] = None,
+        reply_parameters: Optional[Dict] = None,
+        reply_markup: Optional[Dict] = None,
+        business_connection_id: Optional[str] = None,
+        message_thread_id: Optional[int] = None,
+    ):
+        """
+        Send a Live Photo (video + auto-generated photo) — Bot API 10.0.
+        """
+        params: Dict[str, Any] = {"chat_id": chat_id}
+        if video is not None:
+            params["video"] = video
+        if thumbnail is not None:
+            params["thumbnail"] = thumbnail
+        for k, v in (
+            ("duration", duration), ("width", width), ("height", height),
+            ("caption", caption), ("caption_parse_mode", caption_parse_mode),
+            ("caption_entities", caption_entities),
+            ("show_caption_above_media", show_caption_above_media),
+            ("has_spoiler", has_spoiler),
+            ("disable_notification", disable_notification),
+            ("protect_content", protect_content),
+            ("reply_parameters", reply_parameters),
+            ("reply_markup", reply_markup),
+            ("business_connection_id", business_connection_id),
+            ("message_thread_id", message_thread_id),
+        ):
+            if v is not None:
+                params[k] = v
+        return await self._request("sendLivePhoto", **params)
+
+    # ---------- Reactions & messages (Bot API 10.0) ----------
+
+    async def delete_all_message_reactions(
+        self,
+        chat_id: Union[int, str],
+        message_id: Optional[int] = None,
+    ):
+        """Delete all reactions from a message (Bot API 10.0)."""
+        params: Dict[str, Any] = {"chat_id": chat_id}
+        if message_id is not None:
+            params["message_id"] = message_id
+        return await self._request("deleteAllMessageReactions", **params)
+
+    # ---------- Rich Messages & Ephemeral (Bot API 10.2) ----------
+
+    async def send_rich_message(
+        self,
+        chat_id: Union[int, str],
+        message_thread_id: Optional[int] = None,
+        rich_message: Optional[Dict] = None,
+        disable_notification: Optional[bool] = None,
+        protect_content: Optional[bool] = None,
+        reply_parameters: Optional[Dict] = None,
+        business_connection_id: Optional[str] = None,
+        **extra: Any,
+    ):
+        """
+        Send a Rich Message (Bot API 10.2, July 2026).
+
+        Args:
+            chat_id: Target chat
+            rich_message: ``RichMessage`` object as a dict (use
+                ``RichMessage(...).to_dict()`` once added, or build it by
+                hand from ``RichText`` / ``RichBlock`` nodes).
+        """
+        params: Dict[str, Any] = {"chat_id": chat_id}
+        if message_thread_id is not None:
+            params["message_thread_id"] = message_thread_id
+        if rich_message is not None:
+            params["rich_message"] = rich_message
+        for k, v in (
+            ("disable_notification", disable_notification),
+            ("protect_content", protect_content),
+            ("reply_parameters", reply_parameters),
+            ("business_connection_id", business_connection_id),
+        ):
+            if v is not None:
+                params[k] = v
+        params.update({k: v for k, v in extra.items() if v is not None})
+        return await self._request("sendRichMessage", **params)
+
+    async def send_rich_message_draft(
+        self,
+        chat_id: Union[int, str],
+        message_thread_id: Optional[int] = None,
+        rich_message: Optional[Dict] = None,
+        **extra: Any,
+    ):
+        """
+        Send a Rich Message as a chat draft (Bot API 10.2, July 2026).
+        """
+        params: Dict[str, Any] = {"chat_id": chat_id}
+        if message_thread_id is not None:
+            params["message_thread_id"] = message_thread_id
+        if rich_message is not None:
+            params["rich_message"] = rich_message
+        params.update({k: v for k, v in extra.items() if v is not None})
+        return await self._request("sendRichMessageDraft", **params)
+
+    async def edit_message_text_rich(
+        self,
+        rich_message: Dict,
+        chat_id: Optional[Union[int, str]] = None,
+        message_id: Optional[int] = None,
+        inline_message_id: Optional[str] = None,
+        reply_markup: Optional[Dict] = None,
+    ):
+        """
+        Edit a sent message's text as a Rich Message
+        (Bot API 10.2 ``rich_message`` parameter of editMessageText).
+        """
+        params: Dict[str, Any] = {"rich_message": rich_message}
+        if chat_id is not None:
+            params["chat_id"] = chat_id
+        if message_id is not None:
+            params["message_id"] = message_id
+        if inline_message_id is not None:
+            params["inline_message_id"] = inline_message_id
+        if reply_markup is not None:
+            params["reply_markup"] = reply_markup
+        return await self._request("editMessageText", **params)
+
+    async def delete_ephemeral_message(
+        self,
+        chat_id: Union[int, str],
+        message_id: int,
+    ):
+        """
+        Delete a previously sent ephemeral message (Bot API 10.2).
+        """
+        return await self._request(
+            "deleteEphemeralMessage",
+            chat_id=chat_id,
+            message_id=message_id,
+        )
+
+    # ---------- Chat join requests & Mini Apps (Bot API 10.1) ----------
+
+    async def answer_chat_join_request_query(
+        self,
+        chat_id: Union[int, str],
+        user_id: int,
+        message: Optional[Dict] = None,
+        button_texts: Optional[Dict] = None,
+        texts: Optional[Dict] = None,
+    ):
+        """
+        Answer a chat join request with an inline query
+        (Bot API 10.1, June 2026).
+        """
+        params: Dict[str, Any] = {"chat_id": chat_id, "user_id": user_id}
+        if message is not None:
+            params["message"] = message
+        if button_texts is not None:
+            params["button_texts"] = button_texts
+        if texts is not None:
+            params["texts"] = texts
+        return await self._request("answerChatJoinRequestQuery", **params)
+
+    async def send_chat_join_request_web_app(
+        self,
+        chat_id: Union[int, str],
+        user_id: int,
+        **extra: Any,
+    ):
+        """
+        Send a chat join request Web App (Bot API 10.1).
+        """
+        params: Dict[str, Any] = {"chat_id": chat_id, "user_id": user_id}
+        params.update({k: v for k, v in extra.items() if v is not None})
+        return await self._request("sendChatJoinRequestWebApp", **params)
