@@ -1,0 +1,19 @@
+{
+  "framework": "aiogram",
+  "routes": 10,
+  "updates": 10000,
+  "python": "3.12.3",
+  "process_start_rss_kib": 21744,
+  "build_start_rss_kib": 21744,
+  "after_build_rss_kib": 155988,
+  "after_workload_rss_kib": 157660,
+  "peak_sampled_rss_kib": 157660,
+  "build_rss_delta_kib": 134244,
+  "workload_rss_delta_kib": 1672,
+  "peak_rss_delta_from_build_start_kib": 135916,
+  "ru_maxrss_kib": 157660,
+  "build_elapsed_ms": 4286.177641,
+  "handler_hits": 10000,
+  "expected_handler_hits": 10000,
+  "correct": true
+}

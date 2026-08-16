@@ -1,0 +1,19 @@
+{
+  "distribution": "swiftbot",
+  "version": "1.6.3",
+  "python": "3.12.3",
+  "module": "swiftbot",
+  "package_size_bytes": 979521,
+  "package_size_kib": 956.5634765625,
+  "package_file_count": 89,
+  "venv_size_bytes": 51186294,
+  "venv_size_mib": 48.815053939819336,
+  "site_packages_size_bytes": 27107754,
+  "site_packages_size_mib": 25.85196876525879,
+  "direct_requires": [
+    "aiohttp <4.0,>=3.10",
+    "httpx[http2] <0.29.0,>=0.27.0"
+  ],
+  "all_requires_count": 5,
+  "metadata_summary": "Async Telegram bot framework with typed decorators, composable filters, persistent FSM storage and a typed error hierarchy - Bot API 2026"
+}

@@ -730,6 +730,16 @@ class SwiftBot:
         if self.running:
             raise SwiftBotError("Bot is already running")
 
+        try:
+            from .webhook import WebhookServer
+        except ModuleNotFoundError as exc:
+            if exc.name != "aiohttp":
+                raise
+            raise ConfigurationError(
+                "Webhook mode requires the 'aiohttp' dependency. "
+                "Install it with: pip install aiohttp"
+            ) from exc
+
         self.running = True
         self._stats['start_time'] = asyncio.get_event_loop().time()
 
@@ -747,7 +757,6 @@ class SwiftBot:
             )
 
             # Start webhook server
-            from .webhook import WebhookServer
             server = WebhookServer(
                 client=self,
                 host=host,
