@@ -138,6 +138,17 @@ class Context:
         # Middleware data storage
         self.middleware_data: Dict[str, Any] = {}
 
+        # v1.5: typed command parsed by BotCommands / CommandsMiddleware
+        # (None when the update is not a recognised command)
+        self.command = None
+
+        # v1.5: wizard accessor for the bot's wizard registry
+        try:
+            from .wizard import WizardAccessor
+            self.wizard = WizardAccessor(bot)
+        except Exception:
+            self.wizard = None
+
         # Legacy per-context scratch storage (survives one handler only)
         self.user_data = MemoryStorage()
         self.chat_data = MemoryStorage()

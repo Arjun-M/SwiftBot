@@ -236,6 +236,38 @@ async def test_start_handler():
 
 `FakePool.script("methodName", result=...)` and `FakePool.script("methodName", error={"error_code": 400, "description": "..."})` let you drive any API response, and the pool records every outgoing call with method and params.
 
+## 🌟 v1.5.0 — The Standout Release
+
+v1.5 was built by studying the Telegram SDKs of other languages — Rust's
+`teloxide`, TypeScript's `grammy`, Go's `telebot`, Kotlin's `kotlin-telegram-bot`
+— and porting the features the Python ecosystem has been missing for years.
+The full documentation site lives in `docs/index.html`.
+
+| Feature | Module | Inspired by |
+| --- | --- | --- |
+| Declarative handler pipelines with **dependency injection** | `swiftbot.pipeline` | Rust `teloxide` / `dptree` |
+| Declarative typed command specs with auto `/help` | `swiftbot.commands` | Rust `teloxide` `BotCommands` |
+| **Outbound transformer layer** (auto typing, idempotency, Recorder) | `swiftbot.transformer` | TypeScript `grammy` `api.config.use` |
+| Middleware bundles with **error boundaries** | `swiftbot.composer` | TypeScript `grammy` `Composer` / `catch` |
+| Pre-handler dispatch table | `bot.route()` | TypeScript `grammy` `bot.route` |
+| Typed wizards with data carry | `swiftbot.wizard` | Rust `teloxide` `Dialogues` |
+| Graceful shutdown (signal + drain) | `bot.run_shutdown()` | Rust `teloxide` `enable_ctrlc_handler` |
+| First-party plugin registry | `swiftbot.plugins` | Go `telebot` built-in middlewares |
+| `F` filter algebra | `swiftbot.filters` (`F = ...`) | `aiogram` `F` ergonomics |
+
+```python
+# Dependency-injected pipeline handler — no globals needed
+from swiftbot.pipeline import Pipeline
+from swiftbot.filters import F
+
+async def stats(ctx, db, redis):
+    await ctx.reply(f"{await db.count_users()} users · ping={await redis.ping()}")
+
+pipe = Pipeline().deps(db=my_db, redis=my_redis)
+pipe.handle(F.command("stats"), stats)
+bot.pipeline(pipe)
+```
+
 ## 🆕 What's New in 1.4.0
 
 | Module | What it gives you |

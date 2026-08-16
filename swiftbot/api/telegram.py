@@ -85,6 +85,10 @@ class TelegramAPI:
         self.pool = connection_pool
         self.base_url = f"{base_url}/bot{token}"
 
+        # Transformer stack (grammy-style outbound call interceptors).
+        from ..transformer import TransformerConfig
+        self.config = TransformerConfig()
+
     async def _request(self, method: str, **params) -> Any:
         """
         Make API request with automatic error handling.
@@ -105,6 +109,16 @@ class TelegramAPI:
 
         # Remove None values
         params = {k: v for k, v in params.items() if v is not None}
+
+        # --- grammy-style transformer layer: intercept every outbound call ---
+        from ..transformer import _RecorderResult, _RecorderError, TransformerConfig
+        if isinstance(self.config, TransformerConfig) and self.config.transformers:
+            try:
+                params = await self.config.apply(method, params)
+            except _RecorderResult as scripted:
+                return scripted.result  # scripted success: skip the network call
+            except _RecorderError as scripted_err:
+                raise TelegramError.from_response(scripted_err.error_body)
 
         # Convert objects to JSON
         for key, value in params.items():

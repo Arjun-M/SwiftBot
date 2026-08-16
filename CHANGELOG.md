@@ -1,5 +1,55 @@
 # Changelog
 
+## [1.5.0] — 2026-08-16
+
+The "standout" release. v1.5 was built by studying Telegram SDKs in other
+languages (teloxide/Rust, grammy/TypeScript, telebot/Go, kotlin-telegram-bot)
+and porting their best-loved features into idiomatic Python. Full documentation
+site: `docs/index.html`.
+
+### Added
+- **`swiftbot.pipeline` — dependency-injected handler pipelines** (teloxide
+  dptree-style): handlers declare the dependencies they need by parameter name
+  and the `Pipeline` injects them; undeclared dependencies raise
+  `PipelineDependencyMissing` loudly. `bot.pipeline(pipe)` mounts a pipeline as
+  a middleware stage.
+- **`swiftbot.commands` — declarative `BotCommands` specs**: typed arg
+  placeholders (`<name:type>`), aliases, `Cmd.parse()`, auto-generated
+  `help_text`, and `CommandsMiddleware` answering `/help` from the spec.
+- **`swiftbot.transformer` — outbound API call layer** (grammy-style):
+  `bot.api.config.use(...)` intercepts every API call. Built-ins: `auto_typing`,
+  `idempotency_guard`, `call_logger`, `payload_patch`, and `Recorder` for
+  scripting results/errors per method (network-free API-level testing).
+- **`swiftbot.composer` — middleware bundles with `.catch()` error boundaries**:
+  nestable bundles; raw middleware callables are invoked with `(ctx,
+  next_handler)`; `.on_exception()` alias provided.
+- **`bot.route()` — pre-handler dispatch table** mapping update kinds (or raw
+  predicates) to middleware (grammy-style).
+- **`swiftbot.wizard` — typed conversation wizards**: `@step`, `@finish`,
+  `on_enter`/`on_leave` hooks, storage-agnostic state, accumulated answers,
+  `ctx.wizard` accessor; registered via `bot.wizard(name)`.
+- **`bot.run_shutdown()` — graceful shutdown**: SIGINT/SIGTERM handlers plus
+  worker-pool drain (teloxide `enable_ctrlc_handler`-style).
+- **`swiftbot.plugins` — official plugin registry**: `SpamDeflector`,
+  `SessionLimiter`, `Idempotency`, `Whitelist` classes with factory helpers
+  (`spam_deflector`, `session_limiter`, `idempotency`, `whitelist`).
+- **`F` filter algebra** in `swiftbot.filters`: preset factory with combinators
+  (`F.text & F.private & ~F.forwarded`), `supergroup` preset, and
+  `F.command()`/`F.regex()` shortcuts.
+- **`ctx.command`** populated by `CommandsMiddleware` with the parsed command.
+- **50 new tests** covering every v1.5 feature; the full suite is 133 tests, all green.
+
+### Fixed
+- **Transformer short-circuit**: scripted `Recorder` results/errors now flow
+  through `TelegramAPI._request` as control-flow exceptions instead of being
+  logged and hidden by the misbehaving-transformer catch-all.
+- **Composer boundary**: raw middleware callables without `on_update` are now
+  invoked with `(ctx, next_handler)` instead of being silently skipped, and a
+  boundary correctly consumes and stops propagation.
+
+### Changed
+- Version bumped to **1.5.0**; new modules exported from `swiftbot`.
+
 ## [1.4.0] — 2026-08-15
 
 ### Added

@@ -19,6 +19,7 @@ from .exceptions.handlers import CentralizedExceptionHandler
 
 # Remove excessive logging - let middleware handle it
 import logging
+logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("http.client").setLevel(logging.WARNING)
 
@@ -154,6 +155,17 @@ class SwiftBot:
         # Middleware chain
         self.middleware: List = []
 
+        # --- v1.5 standout features ----------------------------------------
+        # Dispatch table mapping update kinds to middleware (grammy bot.route).
+        self._routes: Dict[str, Any] = {}
+        # Mounted declarative pipelines (teloxide dptree-style).
+        self._pipelines: List[Any] = []
+        # Named wizard registry (teloxide dialogue-style).
+        self._wizards: Dict[str, Any] = {}
+        # Graceful-shutdown bookkeeping.
+        self._shutdown_requested = asyncio.Event()
+        # --------------------------------------------------------------------
+
         # Running state
         self.running = False
         self._update_offset = 0
@@ -209,19 +221,141 @@ class SwiftBot:
         """
         Register middleware.
 
+        Accepts plain ``on_update(ctx, next_handler)`` middleware, a
+        ``Composer`` bundle (flattened with its scoped error boundary
+        preserved), or a callable that returns one.
+
         Example:
             from SwiftBot.middleware import Logger
             client.use(Logger(level="INFO"))
 
         Args:
-            middleware: Middleware instance
+            middleware: Middleware instance or ``Composer`` bundle
         """
         try:
-            self.middleware.append(middleware)
+            from .composer import Composer
+            if isinstance(middleware, Composer):
+                # Composer satisfies the middleware protocol itself (nested
+                # middleware run with its own error boundary wrapped around).
+                self.middleware.append(middleware)
+            else:
+                self.middleware.append(middleware)
         except Exception as e:
             if self.exception_handler:
                 self.exception_handler.handle_exception(e, context="middleware_registration")
             raise SwiftBotError(f"Error registering middleware: {e}")
+
+    # ===========================================
+    # v1.5 FEATURE MOUNTS
+    # ===========================================
+
+    def route(self, routing_table: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Dispatch update kinds to middleware *before* handler routing
+        (grammy ``bot.route``). The middleware runs for every update of the
+        given kind and then falls through to the normal router::
+
+            bot.route({
+                "callback_query": callback_middleware,
+                "inline_query": inline_middleware,
+            })
+
+        Args:
+            routing_table: ``{update_kind: middleware}`` mapping. Unknown
+                kinds are ignored with a warning.
+        """
+        valid_kinds = {
+            "message", "edited_message", "channel_post", "edited_channel_post",
+            "callback_query", "inline_query", "chosen_inline_result",
+            "shipping_query", "pre_checkout_query", "poll", "poll_answer",
+            "my_chat_member", "chat_member", "chat_join_request",
+            "message_reaction", "message_reaction_count",
+            "business_connection", "business_message", "edited_business_message",
+            "deleted_business_messages", "purchased_paid_media",
+            "managed_bot_created", "managed_bot_updated",
+            "bot_subscription_updated", "guest_message", "purchase",
+        }
+        for kind, mw in routing_table.items():
+            if kind not in valid_kinds:
+                logger.warning("Unknown update kind in route(): %r", kind)
+                continue
+            self._routes[kind] = mw
+        return routing_table
+
+    def pipeline(self, pipe=None) -> Any:
+        """
+        Mount a declarative ``Pipeline`` (teloxide dptree-style handler tree
+        with dependency injection) onto this bot.
+
+        Args:
+            pipe: a ``Pipeline`` instance. When called with no arguments,
+                creates and returns a fresh one already mounted.
+        Returns:
+            The mounted ``Pipeline``.
+        """
+        from .pipeline import Pipeline
+        if pipe is None:
+            pipe = Pipeline()
+        self._pipelines.append(pipe)
+        return pipe
+
+    def wizard(self, name: str, storage: Optional[Any] = None) -> Any:
+        """
+        Register a named ``Wizard`` conversation and return it::
+
+            survey = bot.wizard("survey")
+        """
+        from .wizard import Wizard
+        wiz = Wizard(name, storage or self.storage)
+        self._wizards[name] = wiz
+        return wiz
+
+    @staticmethod
+    async def _noop():
+        """Empty continuation used by dispatch routes that end the chain."""
+        return None
+
+    async def run_shutdown(self, timeout: float = 30.0) -> None:
+        """
+        Graceful shutdown (teloxide ``enable_ctrlc_handler``): install
+        SIGINT/SIGTERM handlers that stop the bot, drain the worker pool and
+        close storage. Safe to call before ``bot.run()``; if a run loop is
+        active it exits cleanly.
+
+        Args:
+            timeout: seconds to wait for the worker pool to drain.
+        """
+        import signal
+
+        async def _shutdown() -> None:
+            if self.running:
+                self.stop()
+            try:
+                await self.worker_pool.stop(timeout=timeout)
+            except TypeError:
+                try:
+                    await self.worker_pool.stop()
+                except Exception:
+                    pass
+            try:
+                await self.connection_pool.close()
+            except Exception:
+                pass
+            try:
+                if hasattr(self.storage, "close"):
+                    await self.storage.close()
+            except Exception:
+                pass
+            self._shutdown_requested.set()
+
+        loop = asyncio.get_event_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, lambda s=sig: asyncio.ensure_future(_shutdown()))
+            except (NotImplementedError, RuntimeError):
+                # Windows event loops cannot add signal handlers; fall back
+                # to the plain handler registration.
+                signal.signal(sig, lambda *_a, _b=sig: asyncio.ensure_future(_shutdown()))
 
     async def get_me(self, use_cache: bool = True):
         """
@@ -282,12 +416,37 @@ class SwiftBot:
             # Route to handler
             handler, match, event_type = await self.router.route(update_obj, update_type)
 
+            # Create context with proper parameters
+            ctx = Context(self, update, update_obj, match)
+
+            # --- v1.5 dispatch routes: update-kind → middleware (grammy) ---
+            if update_type in self._routes:
+                route_mw = self._routes[update_type]
+                try:
+                    if hasattr(route_mw, "on_update"):
+                        await route_mw.on_update(ctx, self._noop)
+                    elif asyncio.iscoroutinefunction(route_mw):
+                        await route_mw(ctx)
+                except Exception as route_exc:
+                    await self._handle_exception(route_exc, f"route_{update_type}")
+
+            # --- v1.5 pipelines: dptree-style DI handler trees -------------
+            pipeline_handled = False
+            for pipe in self._pipelines:
+                try:
+                    if await pipe.process(ctx, self):
+                        pipeline_handled = True
+                        break
+                except Exception as pipe_exc:
+                    await self._handle_exception(pipe_exc, "pipeline")
+            if pipeline_handled:
+                self._stats['updates_processed'] += 1
+                self._stats['handlers_executed'] += 1
+                return
+
             if not handler:
                 # This is normal, not an error
                 return
-
-            # Create context with proper parameters
-            ctx = Context(self, update, update_obj, match)
 
             # Execute middleware chain and handler
             await self._execute_middleware_chain(ctx, handler)
