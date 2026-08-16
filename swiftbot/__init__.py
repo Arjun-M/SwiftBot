@@ -3,16 +3,18 @@ SwiftBot - Ultra-Fast Telegram Bot Framework
 Copyright (c) 2025 Arjun-M/SwiftBot
 Licensed under MIT License
 
-A Telegram bot framework with Telethon-inspired syntax, HTTP/2 connection
-pooling, persistent FSM storage, a test harness with a fake bot, typed
-callback data, deep linking utilities, full Bot API 2026 support — and the
-v1.5 standout set: declarative dependency-injected pipelines (teloxide
-dptree-style), typed command specs with auto ``/help``, grammy-style outbound
-transformers, composable middleware bundles with error boundaries, update-kind
-dispatch routing, typed wizards, graceful shutdown and first-party plugins.
+A Telegram bot framework with clean decorator syntax, HTTP/2 connection
+pooling, persistent FSM storage, a test harness with a fake pool, typed
+callback data, deep linking utilities, full Bot API 2026 support — plus an
+advanced feature set: dependency-injected handler pipelines, declarative
+command specs with auto ``/help``, an outbound API transformer layer, composable
+middleware bundles with error boundaries, update-kind dispatch routing, typed
+wizards, state-carrying dialogues, scoped middleware, outgoing throttling, a
+fluent reply builder, fallback handlers, graceful shutdown and first-party
+plugins.
 """
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"
 __author__ = "Arjun-M"
 __license__ = "MIT"
 
@@ -34,6 +36,10 @@ from .composer import Composer
 from .wizard import Wizard
 from . import plugins
 from .filters import F
+from .dialogue import Dialogue, DialogueTransitionError
+from .scopes import Scope
+from .throttle import throttle
+from .reply import Reply
 
 
 __all__ = [
@@ -66,4 +72,9 @@ __all__ = [
     "Wizard",
     "plugins",
     "F",
+    "Dialogue",
+    "DialogueTransitionError",
+    "Scope",
+    "throttle",
+    "Reply",
 ]

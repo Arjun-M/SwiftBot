@@ -13,7 +13,7 @@ Usage:
 
 Only the fields a typical bot actually reads are modelled here; everything
 else remains accessible through ``msg.raw``. This mirrors how PTB and
-aiogram balance completeness against churn — extend as the API grows.
+Extend as the API grows — prefer completeness over churn.
 
 Copyright (c) 2026 Arjun-M/SwiftBot
 """

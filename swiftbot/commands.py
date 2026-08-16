@@ -3,7 +3,7 @@ BotCommands — declarative, strongly-typed command specifications.
 
 No Python Telegram framework ships a declarative command language: commands
 are matched by loose text filters and arguments are parsed by hand inside each
-handler. This module brings teloxide's ``#[derive(BotCommands)]`` concept to
+handler. This module turns command handling into a declaration: args parse themselves and a correct ``/help`` is generated from the spec. Brings the
 Python — commands are declared once as attributes on a class, then parsed,
 validated and documented automatically.
 
@@ -274,4 +274,15 @@ class CommandsMiddleware:
         if text:
             parsed = self.spec_cls.parse(text)
             ctx.command = parsed  # None when no match — handlers check ctx.command
+            # v1.6: unrecognized ``/command`` messages go to the bot's
+            # ``on_unknown_command`` handler when one is registered.
+            if text.startswith("/") and parsed is None:
+                bot = getattr(ctx, "bot", None)
+                unknown = getattr(bot, "_unknown_command", None)
+                if unknown is not None:
+                    try:
+                        await unknown(ctx)
+                        return  # the unknown-command handler handled it
+                    except Exception:
+                        raise
         await next_handler()

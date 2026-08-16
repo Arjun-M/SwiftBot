@@ -1,7 +1,7 @@
 """
 Composer — extractable middleware bundles with scoped error boundaries.
 
-grammy (TypeScript/Deno) structures large bots around ``Composer``: modules
+Structures large bots around ``Composer``: modules
 export a bundle of middleware, register scoped ``.catch()`` error handlers,
 and the bot installs the bundle with a single ``bot.use(bundle)``. This lets
 errors in one module be handled by that module instead of bubbling to a

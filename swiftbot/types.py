@@ -69,7 +69,7 @@ class EventType:
         self.patterns = self._compile_patterns(pattern)
         self.func = func  # Legacy support
         # ``filters`` is an alias for ``filter_func`` so call sites can use the
-        # more conventional name used by aiogram / PTB filter systems.
+        # conventional, human-readable name for the filter protocol.
         self.filter_func = filter_func if filter_func is not None else filters
         self.incoming = incoming
         self.outgoing = outgoing

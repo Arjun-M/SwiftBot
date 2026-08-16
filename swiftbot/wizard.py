@@ -1,7 +1,7 @@
 """
 Wizard — typed multi-step conversation dialogs.
 
-teloxide (Rust) models conversations as an enum of states, each carrying its
+Models conversations as a sequence of typed steps, each carrying its
 accumulated data, and dispatches to a handler per state. The Python world
 approximates this with ad-hoc FSM flags and state data dicts. This module
 gives SwiftBot a proper wizard abstraction: steps are declared functions,

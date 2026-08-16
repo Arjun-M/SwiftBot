@@ -434,7 +434,7 @@ class CustomFilter(Filter):
 class _FPreset:
     """
     Lazy preset factory powering the ``F.text & F.private & ~F.forwarded`` style
-    of filter composition (aiogram-style ergonomics on top of the existing
+    of filter composition (idiomatic Python on top of the existing
     Filter algebra).
 
     Accessing an attribute returns a fresh callable ``Filter`` instance so

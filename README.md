@@ -269,6 +269,50 @@ pipe.handle(F.command("stats"), stats)
 bot.pipeline(pipe)
 ```
 
+## 🌟 v1.6.0 — Dialogues, Scopes & Safety Nets
+
+v1.6 adds the state-machine and safety-net layer: **state-carrying dialogues**
+(declared transition graphs, typed carry data between states, per-state
+timeouts with an expiry hook), **scoped middleware chains** guarded by
+predicates over the raw update, **outbound rate-limit throttling** as a
+transformer, a **fluent `Reply` builder**, and **fallback / unknown-command
+handlers**. Documentation site: `docs/index.html`.
+
+| Feature | Module |
+| --- | --- |
+| State-carrying dialogue FSM with transition graph + timeout | `swiftbot.dialogue` |
+| Predicate-guarded scoped middleware | `swiftbot.scopes` + `bot.scope()` |
+| Outbound token-bucket rate limiting | `swiftbot.throttle` |
+| Fluent reply builder | `swiftbot.reply` (`Reply(ctx)`) |
+| Fallback + unknown-command handlers | `bot.fallback()`, `bot.on_unknown_command()` |
+
+```python
+# A dialogue: states carry their own data, transitions are declared
+survey = bot.dialogue("survey")
+
+@survey.state("ask_name", next=["ask_age"])
+async def ask_name(ctx, prev=None):
+    await ctx.reply("What's your name?")
+    return Dialogue.next("ask_age", carry=ctx.text)
+
+@survey.state("ask_age", timeout=120.0)
+async def ask_age(ctx, prev=None):
+    await ctx.reply(f"Hi {prev}, how old are you?")
+    return Dialogue.end
+
+# Scoped middleware — runs only where the predicate matches
+bot.scope(lambda u: u.get("message", {}).get("chat", {}).get("type") == "private") \
+   .use(plugins.session_limiter(min_interval=1.0))
+
+# Outbound rate limiting
+bot.api.config.use(throttle(max_per_second=20.0, per_chat=4.0))
+
+# Safety nets
+@bot.fallback
+async def catch_all(ctx):
+    await ctx.reply("I didn't catch that — try /help.")
+```
+
 ## 🆕 What's New in 1.4.0
 
 | Module | What it gives you |

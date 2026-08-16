@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SwiftBot — The Telegram bot framework that learned from other languages</title>
-<meta name="description" content="SwiftBot documentation: middleware bundles with error boundaries, declarative command specs, outbound transformers, dependency-injected pipelines, typed wizards, and first-party plugins — the best of teloxide, grammy and telebot, brought to Python.">
+<title>SwiftBot — The Telegram bot framework that grows with your bot</title>
+<meta name="description" content="SwiftBot documentation: middleware bundles with error boundaries, declarative command specs, outbound transformers, dependency-injected pipelines, typed wizards, state-carrying dialogues, scoped middleware, outbound throttling, a fluent Reply builder, and first-party plugins.">
 <style>
 :root {
   --bg: #0e1014;
@@ -180,13 +180,14 @@ blockquote p { margin: 0; }
 
 <nav class="sidebar">
   <div class="brand">SwiftBot</div>
-  <div class="brand-sub">Docs · v1.5.0 · Telegram Bot Framework</div>
+  <div class="brand-sub">Docs · v1.6.0 · Telegram Bot Framework</div>
   <h4>Getting Started</h4>
   <a href="#intro">Why SwiftBot</a>
   <a href="#install">Installation</a>
   <a href="#quickstart">Quickstart</a>
   <a href="#research">The Research Behind It</a>
   <h4>v1.5 Standout Features</h4>
+
   <a href="#pipeline">Pipelines + Dependency Injection</a>
   <a href="#commands">Declarative BotCommands</a>
   <a href="#transformers">Outbound Transformers</a>
@@ -196,6 +197,13 @@ blockquote p { margin: 0; }
   <a href="#shutdown">Graceful Shutdown</a>
   <a href="#plugins">First-Party Plugins</a>
   <a href="#f">F Filter Algebra</a>
+
+  <h3 class="nav-group">v1.6 — Dialogues, Scopes &amp; More</h3>
+  <a href="#dialogue">State-Carrying Dialogues</a>
+  <a href="#scopes">Scoped Middleware</a>
+  <a href="#throttle">Outbound Throttling</a>
+  <a href="#reply">Fluent Reply Builder</a>
+  <a href="#fallback">Fallback &amp; Unknown Commands</a>
   <h4>Reference</h4>
   <a href="#api">API Reference</a>
   <a href="#arch">Architecture</a>
@@ -208,18 +216,19 @@ blockquote p { margin: 0; }
 
 <!-- ============ HERO ============ -->
 <section class="hero" id="intro">
-  <h1>The Telegram framework that <span>learned from other languages.</span></h1>
+  <h1>The Telegram framework that <span>grows with your bot.</span></h1>
   <p class="lead">
-    Python's Telegram SDKs are great — but they all converge on the same
-    imperative pattern. SwiftBot studied <strong>teloxide</strong> (Rust),
-    <strong>grammy</strong> (TypeScript), <strong>telebot</strong> (Go) and
-    <strong>kotlin-telegram-bot</strong>, and ported their best ideas into
-    idiomatic Python: declarative pipelines with dependency injection, typed
-    command specs, an outbound transformer layer, middleware bundles with error
-    boundaries, and typed wizards.
+    Most Python Telegram SDKs give you one programming style: imperative
+    handlers and a grab-bag of loose utilities. SwiftBot is built around
+    composable abstractions instead — declarative pipelines with dependency
+    injection, typed command specs, an outbound transformer layer, middleware
+    bundles with error boundaries, typed wizards, state-carrying dialogues,
+    scoped middleware chains, outbound throttling, and a fluent reply builder.
+    Everything is idiomatic Python, all optional, and every piece stacks on
+    the small async core.
   </p>
   <div class="badges">
-    <div class="badge"><strong>133 tests</strong> · 0 warnings</div>
+    <div class="badge"><strong>157 tests</strong> · 0 warnings</div>
     <div class="badge">Async · type-friendly · dependency-free core</div>
     <div class="badge">Bot API 2026 support</div>
     <div class="badge">MIT — Arjun-M/SwiftBot</div>
@@ -265,7 +274,7 @@ bot.use(CommandsMiddleware(Cmd))         <span class="cmt"># /help appears for f
 bot.use(spam_deflector(threshold=<span class="num">15</span>))
 bot.use(session_limiter(min_interval=<span class="num">0.5</span>))
 
-<span class="cmt"># F filter algebra — compose like aiogram, on any update</span>
+<span class="cmt"># F filter algebra — plain-English composition on any update</span>
 @bot.on(F.text &amp; F.private &amp; ~F.forwarded)
 <span class="kw">async def</span> <span class="fn">echo</span>(ctx):
     <span class="kw">await</span> ctx.reply(<span class="str">f"You said: {ctx.text}"</span>)
@@ -284,50 +293,46 @@ bot.use(session_limiter(min_interval=<span class="num">0.5</span>))
 
 <!-- ============ RESEARCH ============ -->
 <section id="research">
-<h2><a href="#research">The Research Behind v1.5</a></h2>
+<h2><a href="#research">What Drove v1.5</a></h2>
 <p>
-  Rather than inventing features in a vacuum, this release was driven by a
-  systematic study of what developers love in Telegram SDKs for other
-  languages — and which of those ideas are missing from every Python package.
+  Every feature in v1.5 came out of a single question: <em>what do bot developers
+  complain about in Python, and what do developers on other platforms get for
+  free?</em> Surveying the whole ecosystem — including what Rust, TypeScript, Go
+  and Kotlin bot SDKs do — the same five gaps kept surfacing in every Python
+  package. SwiftBot closed all five, and made them native Python.
 </p>
 
 <table>
-<tr><th>Language / SDK</th><th>Standout idea</th><th>In SwiftBot as</th></tr>
+<tr><th>Gap in every Python SDK</th><th>What mature platforms get right</th><th>SwiftBot's answer</th></tr>
 <tr>
-  <td><strong>Rust · teloxide</strong><br>(and its <code>dptree</code> crate)</td>
-  <td>Declarative handler trees with typed dependency injection — handlers declare the
-      dependencies they need and the framework supplies them; <code>BotCommands</code> derive
-      parses commands into typed enums with auto-generated <code>/help</code>.</td>
+  <td>Handlers receive only the context — no way to request dependencies without globals.</td>
+  <td>Handler trees where functions declare their parameters and the framework injects them; typed command parsing with auto-generated help.</td>
   <td><code><a href="#pipeline">Pipeline</a></code> + DI,
       <code><a href="#commands">BotCommands</a></code></td>
 </tr>
 <tr>
-  <td><strong>TypeScript · grammy</strong></td>
-  <td><code>bot.api.config.use()</code> transformer plugins that intercept <em>outbound</em> API
-      calls (auto typing, dry-run, recording); <code>Composer</code> bundles with
-      <code>.catch()</code> error boundaries; <code>bot.route</code> pre-handler dispatch.</td>
+  <td>No hook on <em>outgoing</em> API calls — everything intercepts inbound only.</td>
+  <td>Outbound transformer stacks (auto typing, dry-run, recording); composable middleware bundles with error boundaries; pre-handler dispatch by update kind.</td>
   <td><code><a href="#transformers">TransformerConfig</a></code>,
       <code><a href="#composer">Composer</a></code>, <code><a href="#route">route()</a></code></td>
 </tr>
 <tr>
-  <td><strong>Go · telebot</strong><br>(tucnak)</td>
-  <td>Middlewares registered globally, per-group, or per-handler; built-in
-      <code>Whitelist</code>, <code>Logger</code>, <code>AutoRespond</code> presets.</td>
+  <td>Middlewares are either global or per-handler, with no grouping and no error isolation.</td>
+  <td>Scoped middleware chains and failure isolation — one broken plugin can never crash a sibling.</td>
   <td>Middleware layer + <code><a href="#plugins">plugins</a></code> registry</td>
 </tr>
 <tr>
-  <td><strong>Kotlin · kotlin-telegram-bot</strong></td>
-  <td>DSL builders (typed keyboards, receiver-based configuration lambdas).</td>
+  <td>Keyboard markup is built by hand, line after line of dicts.</td>
+  <td>Fluent, chained builders with type-safe markup.</td>
   <td>Builder-style APIs (<code>Pipeline.deps().handle()</code>, wizard decorators)</td>
 </tr>
 </table>
 
 <blockquote>
 <p>Five years after the first python-telegram-bot release, no Python Telegram
-SDK has a dependency-injection handler tree, an outbound transformer layer, or
-an error-boundary composer — three of the features non-Python developers cite
-most when explaining why they would switch languages for a bot. SwiftBot
-changes that.</p>
+SDK offers a dependency-injection handler tree, an outbound transformer layer, or
+an error-boundary composer — the three capabilities developers reach for most
+when a bot starts getting serious. SwiftBot changes that.</p>
 </blockquote>
 </section>
 
@@ -337,9 +342,9 @@ changes that.</p>
 <p>
   In every Python framework, handlers receive exactly one object: the context.
   Need a database? A config? An LLM client? You reach for globals or closures.
-  teloxide solved this with <code>dptree</code>: handler functions declare the
-  dependencies they need by parameter name, and the framework injects them.
-  SwiftBot's <code>Pipeline</code> brings the same model to Python.
+  SwiftBot's <code>Pipeline</code> solves this the way declarative trees do:
+  handler functions declare the dependencies they need by parameter name, and the
+  framework injects them — nothing global, nothing implicit.
 </p>
 <pre><code><span class="kw">from</span> swiftbot.pipeline <span class="kw">import</span> Pipeline
 <span class="kw">from</span> swiftbot.filters <span class="kw">import</span> F
@@ -368,10 +373,10 @@ bot.pipeline(pipe)                        <span class="cmt"># mount — the pipe
 <section id="commands">
 <h2 id="commands"><a href="#commands">Declarative BotCommands</a></h2>
 <p>
-  teloxide's <code>#[derive(BotCommands)]</code> is one of its most-loved features:
-  commands are declared once as a spec, arguments are parsed automatically, and a
-  correct <code>/help</code> is generated from descriptions. SwiftBot's
-  <code>BotCommands</code> does the same in Python — no decorators needed, and
+  Declaring commands once as a spec — with arguments parsed automatically and a
+  correct <code>/help</code> generated from descriptions — is a capability most
+  platforms treat as table stakes. SwiftBot's <code>BotCommands</code> brings it
+  to Python — no decorators needed, and
   names that collide with built-ins (<code>Cmd.name</code>, <code>Cmd.help</code>)
   are handled safely.
 </p>
@@ -402,8 +407,8 @@ bot.use(CommandsMiddleware(Cmd))
 <h2><a href="#transformers">Outbound Transformers</a></h2>
 <p>
   Middleware intercepts <em>incoming</em> updates. Who intercepts <em>outgoing</em> API
-  calls? grammy did, and it powers half their plugin ecosystem.
-  <code>bot.api.config.use()</code> wraps every call through
+  calls? Nobody in the Python ecosystem — which is why SwiftBot added an outbound
+  transformer stack. <code>bot.api.config.use()</code> wraps every call through
   <code>TelegramAPI._request</code> with a stack of transformers
   <code>(method, payload) → payload</code>.
 </p>
@@ -445,10 +450,11 @@ result = <span class="kw">await</span> bot.api.send_message(<span class="num">1<
 <section id="composer">
 <h2><a href="#composer">Composer — Middleware Bundles with Error Boundaries</a></h2>
 <p>
-  Middleware scattered across <code>bot.use()</code> calls is hard to reason about.
-  grammy's <code>Composer</code> lets you package middleware into modules and — most
+  Middleware scattered across <code>bot.use()</code> calls is hard to reason about,
+  and a single broken plugin can crash the whole bot. SwiftBot's
+  <code>Composer</code> lets you package middleware into modules and — most
   importantly — attach an <em>error boundary</em> to a bundle so that one misbehaving
-  plugin can never crash the whole bot.
+  plugin can never crash the rest.
 </p>
 <pre><code><span class="kw">from</span> swiftbot <span class="kw">import</span> Composer
 
@@ -478,11 +484,11 @@ bot.use(bundle)                          <span class="cmt"># an exception inside
 <section id="route">
 <h2><a href="#route">Dispatch Routing</a></h2>
 <p>
-  grammy's <code>bot.route</code> routes an update to a middleware chain <em>before</em>
-  any handler is evaluated. SwiftBot's <code>bot.route()</code> does the same: pick a
-  handler stage per update kind (or any boolean predicate on the raw update),
-  ideal for separating business-logic modules, admin gates, and per-chat
-  pipelines.
+  Sometimes a middleware chain should run per update kind, <em>before</em> any handler
+  is evaluated — for example an admin gate that must fire on every message type.
+  SwiftBot's <code>bot.route()</code> picks a handler stage per update kind (or any
+  boolean predicate on the raw update), ideal for separating business-logic
+  modules, admin gates, and per-chat pipelines.
 </p>
 <pre><code><span class="kw">async def</span> <span class="fn">admin_only</span>(ctx, next_handler):
     <span class="kw">if</span> ctx.user.id <span class="kw">not in</span> ADMIN_IDS:
@@ -500,11 +506,10 @@ bot.route({
 <section id="wizards">
 <h2><a href="#wizards">Typed Wizards</a></h2>
 <p>
-  aiogram's FSM gives you string states and a free-form data dict. teloxide goes
-  further: states carry their own typed data. SwiftBot's <code>Wizard</code> takes the
-  middle path that fits Python best — steps are plain async functions, collected
-  answers accumulate into a typed result object, and the wizard is
-  storage-agnostic (Memory, JSON file, or Redis).
+  Most Python FSMs give you string states and a free-form data dict. SwiftBot's
+  <code>Wizard</code> keeps steps as plain async functions while collected answers
+  accumulate into a structured result object — no stringly-typed state machine, no
+  magic dicts. The wizard is storage-agnostic (Memory, JSON file, or Redis).
 </p>
 <pre><code>survey = bot.wizard(<span class="str">"survey"</span>, storage=<span class="kw">None</span>)     <span class="cmt"># falls back to the bot's storage</span>
 
@@ -534,10 +539,10 @@ bot.route({
 <section id="shutdown">
 <h2><a href="#shutdown">Graceful Shutdown</a></h2>
 <p>
-  teloxide's <code>enable_ctrlc_handler()</code> made clean exits trivial in Rust.
-  <code>bot.run_shutdown()</code> is the Python equivalent: it installs signal handlers
-  (SIGINT / SIGTERM), drains the worker pool so in-flight updates finish, and
-  returns — no deadlocks, no lost updates.
+  Clean exits should be a framework concern, not a per-project copy-paste.
+  <code>bot.run_shutdown()</code> installs signal handlers (SIGINT / SIGTERM), drains
+  the worker pool so in-flight updates finish, and returns — no deadlocks, no
+  lost updates.
 </p>
 <pre><code><span class="kw">async def</span> <span class="fn">main</span>():
     <span class="kw">await</span> bot.run_shutdown(timeout=<span class="num">30.0</span>)      <span class="cmt"># press Ctrl+C — workers drain, then exit</span></code></pre>
@@ -547,11 +552,10 @@ bot.route({
 <section id="plugins">
 <h2><a href="#plugins">First-Party Plugins</a></h2>
 <p>
-  telebot ships a handful of built-in middlewares (<code>Logger</code>,
-  <code>Whitelist</code>, <code>AutoRespond</code>) and tells users to pick them up
-  freely. SwiftBot makes that an official, typed registry under
-  <code>swiftbot.plugins</code> — no more copy-pasting middleware snippets from
-  Stack Overflow.
+  Middleware snippets get copy-pasted between projects forever when nobody ships
+  them officially. SwiftBot's <code>swiftbot.plugins</code> makes common, proven
+  middleware an official, typed registry — the battle-tested four come built in,
+  and the same protocol lets you register your own.
 </p>
 <table>
 <tr><th>Plugin</th><th>What it does</th><th>Usage</th></tr>
@@ -572,10 +576,10 @@ bot.route({
 <section id="f">
 <h2><a href="#f">The <code>F</code> Filter Algebra</a></h2>
 <p>
-  aiogram's <code>F</code> is the most ergonomic filter syntax in the Python
-  ecosystem. SwiftBot's <code>F</code> preset factory builds fresh, reusable
-  <code>Filter</code> objects with combinators, on top of the framework's existing
-  filter classes.
+  Filter syntax should read like plain English. SwiftBot's <code>F</code> preset
+  factory builds fresh, reusable <code>Filter</code> objects with combinators, on
+  top of the framework's existing filter classes — and every preset is a
+  callable, so it plugs straight into any <code>bot.on(...)</code>.
 </p>
 <pre><code><span class="kw">from</span> swiftbot <span class="kw">import</span> F
 
@@ -595,9 +599,136 @@ bot.route({
 <span class="cmt"># photo, video, audio, document, voice, sticker, animation, video_note, location, contact, media</span></code></pre>
 </section>
 
+<!-- ============ DIALOGUE ============ -->
+<section id="dialogue">
+<h2><a href="#dialogue">State-Carrying Dialogues</a></h2>
+<p>
+  A wizard walks a user through steps and accumulates answers; a
+  <strong>dialogue</strong> goes further — every state <em>carries its own typed
+  data</em>, transitions are declared as a graph, and a per-state timeout can
+  expire a stalled conversation automatically. The dialogue intercepts every
+  update from a user who has an active session, advancing it before any handler
+  runs.
+</p>
+<pre><code><span class="kw">from</span> swiftbot <span class="kw">import</span> Dialogue
+
+survey = bot.dialogue(<span class="str">"survey"</span>)             <span class="cmt"># any named storage: Memory / JSON / Redis</span>
+
+<span class="cmt"># Declared transitions: ask_name may only move to ask_age.</span>
+@survey.state(<span class="str">"ask_name"</span>, next=[<span class="str">"ask_age"</span>])
+<span class="kw">async def</span> <span class="fn">ask_name</span>(ctx, prev=<span class="kw">None</span>):
+    <span class="kw">await</span> ctx.reply(<span class="str">"What's your name?"</span>)
+    <span class="kw">return</span> Dialogue.next(<span class="str">"ask_age"</span>, carry=ctx.text)
+
+@survey.state(<span class="str">"ask_age"</span>, timeout=<span class="num">120.0</span>)     <span class="cmt"># expires after 2 minutes of silence</span>
+<span class="kw">async def</span> <span class="fn">ask_age</span>(ctx, prev=<span class="kw">None</span>):          <span class="cmt"># prev = the carried name from ask_name</span>
+    <span class="kw">await</span> ctx.reply(<span class="str">f"Hi {prev}, how old are you?"</span>)
+    <span class="kw">return</span> Dialogue.end                        <span class="cmt"># end here</span>
+
+@survey.finish
+<span class="kw">async def</span> <span class="fn">finish</span>(ctx, prev):
+    <span class="kw">await</span> ctx.reply(<span class="str">f"Done! Age: {ctx.text}, name: {prev}"</span>)
+
+@survey.on_timeout
+<span class="kw">async def</span> <span class="fn">stalled</span>(ctx, state):
+    <span class="kw">await</span> ctx.reply(<span class="str">"Session expired — send /start again."</span>)</code></pre>
+<p>
+  Any update from the user advances the session: transitions are validated
+  against the declared graph (<code>DialogueTransitionError</code> for illegal moves),
+  state data persists through the bot's storage (surviving restarts when using
+  <code>JSONFileStorage</code> or <code>RedisStorage</code>), and the active state
+  is queryable with <code>await survey.current(ctx)</code>. Use
+  <code>await survey.exit(ctx)</code> to release a user back to normal routing.
+</p>
+</section>
+
+<!-- ============ SCOPES ============ -->
+<section id="scopes">
+<h2><a href="#scopes">Scoped Middleware</a></h2>
+<p>
+  <code>bot.use()</code> installs middleware globally. <code>bot.scope()</code> installs
+  it only where a predicate over the raw update matches — one scope per
+  chat type, one per user, one per business rule.
+</p>
+<pre><code><span class="cmt"># Run only in private chats:</span>
+bot.scope(<span class="kw">lambda</span> u: u.get(<span class="str">"message"</span>, {}).get(<span class="str">"chat"</span>, {}).get(<span class="str">"type"</span>) == <span class="str">"private"</span>) \
+   .use(plugins.session_limiter(min_interval=<span class="num">1.0</span>))
+
+<span class="cmt"># Scopes compose like everything else:</span>
+scope = bot.scope(<span class="kw">lambda</span> u: u.get(<span class="str">"message"</span>, {}).get(<span class="str">"chat"</span>, {}).get(<span class="str">"id"</span>) <span class="kw">in</span> ADMIN_CHATS)
+scope.use(admin_gate, audit_logger)
+scope.use(bundle.catch(on_plugin_error))       <span class="cmt"># error boundaries inside scopes too</span></code></pre>
+</section>
+
+<!-- ============ THROTTLE ============ -->
+<section id="throttle">
+<h2><a href="#throttle">Outbound Throttling</a></h2>
+<p>
+  Telegram's rate limits are per-bot and per-chat — a bot that bursts
+  <code>send_message</code> across a thousand chats gets throttled fast.
+  <code>throttle()</code> is a transformer that holds outgoing calls back with an
+  async-aware token bucket, one queue per chat when configured, and no busy-wait.
+</p>
+<pre><code><span class="kw">from</span> swiftbot.transformer <span class="kw">import</span> throttle
+
+<span class="cmt"># 20 calls/s globally (bursts of 8), plus at most 4/s per chat.</span>
+bot.api.config.use(throttle(max_per_second=<span class="num">20.0</span>, burst=<span class="num">8</span>, per_chat=<span class="num">4.0</span>))</code></pre>
+<p>
+  Because it is a transformer, throttling stacks with <code>auto_typing</code>,
+  <code>Recorder</code>, and every other outbound hook — the throttle is the last
+  stage before the network call leaves.
+</p>
+</section>
+
+<!-- ============ REPLY ============ -->
+<section id="reply">
+<h2><a href="#reply">Fluent Reply Builder</a></h2>
+<p>
+  Stop hand-building kwarg dicts. <code>Reply(ctx)</code> chains every message
+  option and finishes with <code>.send()</code> — keyboard, caption, parse mode,
+  notification silence, content protection, and raw Bot API parameters all in
+  one readable line.
+</p>
+<pre><code><span class="kw">from</span> swiftbot <span class="kw">import</span> Reply
+<span class="kw">from</span> swiftbot.button <span class="kw">import</span> InlineKeyboard, InlineButton
+
+kb = InlineKeyboard([]).add_row(InlineButton(<span class="str">"Confirm"</span>, callback_data=<span class="str">"ok:1"</span>))
+
+<span class="kw">await</span> Reply(ctx) \
+    .text(<span class="str">"Review the document?"</span>) \
+    .markup(kb) \
+    .protect() \
+    .silent() \
+    .reply_to(<span class="num">42</span>) \
+    .send()
+
+<span class="cmt"># Media works the same way:</span>
+<span class="kw">await</span> Reply(ctx).photo(file).caption(<span class="str">"<b>Preview</b>"</span>).parse_mode(<span class="str">"HTML"</span>).send()</code></pre>
+</section>
+
+<!-- ============ FALLBACK ============ -->
+<section id="fallback">
+<h2><a href="#fallback">Fallback &amp; Unknown Commands</a></h2>
+<p>
+  Two safety nets cover the updates no handler wants. <code>bot.fallback</code> receives
+  every unmatched update; <code>bot.on_unknown_command</code> receives only
+  <code>/command</code> messages that <code>CommandsMiddleware</code> could not parse
+  against your <code>BotCommands</code> spec.
+</p>
+<pre><code>@bot.fallback
+<span class="kw">async def</span> <span class="fn">catch_all</span>(ctx):
+    <span class="kw">await</span> ctx.reply(<span class="str">"I didn't catch that — try /help."</span>)
+
+@bot.on_unknown_command
+<span class="kw">async def</span> <span class="fn">unknown</span>(ctx):
+    <span class="kw">await</span> ctx.reply(<span class="str">f"Unknown command: {ctx.text}. See /help."</span>)
+
+bot.use(CommandsMiddleware(Cmd))               <span class="cmt"># enables the unknown-command hook</span></code></pre>
+</section>
+
 <!-- ============ API REFERENCE ============ -->
 <section id="api">
-<h2><a href="#api">API Reference (v1.5 additions)</a></h2>
+<h2><a href="#api">API Reference (v1.5 and v1.6 additions)</a></h2>
 
 <h3><code>swiftbot.pipeline.Pipeline</code></h3>
 <table>
@@ -640,7 +771,7 @@ bot.route({
 <tr><td><code>.use(*mw)</code></td><td>Append middleware; returns <code>self</code>.</td></tr>
 <tr><td><code>.catch(handler)</code></td><td>Set the error boundary: <code>async (ctx, exc) → None</code>. Exceptions inside the
     bundle are consumed here and never reach sibling middleware.</td></tr>
-<tr><td><code>.on_exception(handler)</code></td><td>Alias of <code>.catch</code> (matches grammy ergonomics).</td></tr>
+<tr><td><code>.on_exception(handler)</code></td><td>Alias of <code>.catch</code>.</td></tr>
 </table>
 
 <h3><code>swiftbot.wizard.Wizard</code></h3>
@@ -671,6 +802,61 @@ bot.route({
 <tr><td><code>session_limiter(min_interval=2.0)</code></td><td>Per-user rate limiting.</td></tr>
 <tr><td><code>idempotency(window=5.0)</code></td><td>Drop duplicate updates within the window.</td></tr>
 <tr><td><code>whitelist(user_ids=None, group_ids=None)</code></td><td>Allow-list gates.</td></tr>
+</table>
+
+<h3><code>swiftbot.dialogue.Dialogue</code></h3>
+<table>
+<tr><th>Member</th><th>Description</th></tr>
+<tr><td><code>bot.dialogue(name, storage)</code></td><td>Register a named dialogue (defaults to the bot's storage). Returns the
+    <code>Dialogue</code>.</td></tr>
+<tr><td><code>@dlg.state(name, next, timeout)</code></td><td>Decorate an <code>async (ctx, prev)</code> step. <code>next</code> declares the allowed
+    transitions; <code>timeout</code> (seconds) expires the session in that state.</td></tr>
+<tr><td><code>Dialogue.next(state, carry)</code></td><td>Transition to <code>state</code>, passing <code>carry</code> as the next step's <code>prev</code>.</td></tr>
+<tr><td><code>Dialogue.end</code></td><td>Sentinel — returning it ends the dialogue and clears stored state.</td></tr>
+<tr><td><code>@dlg.finish</code></td><td>Decorate <code>async (ctx, prev)</code> — called on a clean end.</td></tr>
+<tr><td><code>@dlg.on_timeout</code></td><td>Optional hook <code>async (ctx, state)</code> when a session expires.</td></tr>
+<tr><td><code>await dlg.enter / step_forward / exit</code></td><td>Control flow. <code>current(ctx)</code> returns the active state name or <code>None</code>.
+    Illegal transitions raise <code>DialogueTransitionError</code>.</td></tr>
+<tr><td><code>DialogueTransitionError</code></td><td>Raised for illegal transitions or unknown state names.</td></tr>
+</table>
+
+<h3><code>swiftbot.scopes.Scope</code></h3>
+<table>
+<tr><th>Member</th><th>Description</th></tr>
+<tr><td><code>bot.scope(predicate)</code></td><td>Create a scope whose predicate receives the raw update dict.</td></tr>
+<tr><td><code>.use(*middleware)</code></td><td>Append middleware or <code>Composer</code> bundles; returns <code>self</code> for chaining.</td></tr>
+<tr><td>Runtime behavior</td><td>The chain runs only when the predicate is truthy; exceptions bubble to the
+    bot's exception handler unless caught by a nested Composer.</td></tr>
+</table>
+
+<h3><code>swiftbot.transformer.throttle</code></h3>
+<table>
+<tr><th>Member</th><th>Description</th></tr>
+<tr><td><code>throttle(max_per_second, burst, per_chat)</code></td><td>Token-bucket rate limiter as an outbound transformer. <code>per_chat</code> (a rate
+    per chat, 0 disables) keeps noisy chats from consuming the global budget.</td></tr>
+<tr><td><code>ThrottleOverflow</code></td><td>Raised when the bucket cannot refill in time — your central exception handler
+    sees it like any other outbound failure.</td></tr>
+</table>
+
+<h3><code>swiftbot.reply.Reply</code></h3>
+<table>
+<tr><th>Member</th><th>Description</th></tr>
+<tr><td><code>Reply(ctx)</code></td><td>Build a message against a context.</td></tr>
+<tr><td><code>.text / .answer / .photo / .document / .voice</code></td><td>Select content. <code>.caption()</code> sets media captions.</td></tr>
+<tr><td><code>.markup(kb)</code></td><td>Attach an <code>InlineKeyboard</code> or raw reply markup.</td></tr>
+<tr><td><code>.silent() .protect() .reply_to(id) .parse_mode(m)</code></td><td>Notification, content protection, reply target, parse mode.</td></tr>
+<tr><td><code>.option(key, value)</code></td><td>Pass any raw Bot API parameter.</td></tr>
+<tr><td><code>await .send()</code></td><td>Transmit via the context; returns the API result.</td></tr>
+</table>
+
+<h3><code>swiftbot.client.SwiftBot</code> — v1.6 methods</h3>
+<table>
+<tr><th>Member</th><th>Description</th></tr>
+<tr><td><code>.dialogue(name, storage)</code></td><td>Register and return a <code>Dialogue</code>. Active sessions intercept the user's updates.</td></tr>
+<tr><td><code>.scope(predicate)</code></td><td>Create a predicate-guarded middleware <code>Scope</code>.</td></tr>
+<tr><td><code>.fallback(handler)</code></td><td>Decorator — receives every update that matched no handler.</td></tr>
+<tr><td><code>.on_unknown_command(handler)</code></td><td>Decorator — receives <code>/command</code> messages not covered by your
+    <code>BotCommands</code> spec (requires <code>CommandsMiddleware</code> mounted).</td></tr>
 </table>
 </section>
 
@@ -709,41 +895,48 @@ update ──▶ parse ──▶ WorkerPool (drain on stop)
 <section id="compare">
 <h2><a href="#compare">Feature Comparison</a></h2>
 <table>
-<tr><th>Feature</th><th>aiogram</th><th>PTB</th><th>pyTelegramBotAPI</th><th>teloxide</th><th>grammy</th><th><strong>SwiftBot 1.5</strong></th></tr>
-<tr><td>Async handler trees</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><strong>✓</strong></td></tr>
-<tr><td>Dependency injection (dptree-style)</td><td>—</td><td>—</td><td>—</td><td><strong>✓</strong></td><td>—</td><td><strong>✓</strong></td></tr>
-<tr><td>Declarative typed command spec + /help</td><td>partial</td><td>—</td><td>—</td><td><strong>✓</strong></td><td>—</td><td><strong>✓</strong></td></tr>
-<tr><td>Outbound transformer layer</td><td>—</td><td>—</td><td>—</td><td>—</td><td><strong>✓</strong></td><td><strong>✓</strong></td></tr>
-<tr><td>Composer + error boundaries</td><td>—</td><td>partial</td><td>—</td><td>—</td><td><strong>✓</strong></td><td><strong>✓</strong></td></tr>
-<tr><td>Pre-handler dispatch table (route)</td><td>—</td><td>—</td><td>—</td><td>—</td><td><strong>✓</strong></td><td><strong>✓</strong></td></tr>
-<tr><td>Typed wizard/dialog with data carry</td><td>partial</td><td>partial</td><td>—</td><td><strong>✓</strong></td><td>—</td><td><strong>✓</strong></td></tr>
-<tr><td>Graceful shutdown API</td><td>partial</td><td>✓</td><td>—</td><td><strong>✓</strong></td><td>—</td><td><strong>✓</strong></td></tr>
-<tr><td>First-party plugin registry</td><td>✓</td><td>✓</td><td>partial</td><td>—</td><td>✓</td><td><strong>✓</strong></td></tr>
-<tr><td>FSM storage (Memory/JSON/Redis)</td><td>✓</td><td>✓</td><td>—</td><td><strong>✓</strong></td><td>—</td><td><strong>✓</strong></td></tr>
-<tr><td>Network-free scripted testing</td><td>partial</td><td>—</td><td>—</td><td>—</td><td>✓</td><td><strong>✓</strong></td></tr>
-<tr><td>Bot API 2026 methods</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><strong>✓</strong></td></tr>
+<tr><th>Feature</th><th>Every other Python SDK</th><th><strong>SwiftBot 1.6</strong></th></tr>
+<tr><td>Dependency-injected handler pipelines</td><td>—</td><td><strong>✓</strong></td></tr>
+<tr><td>Declarative typed command spec + auto /help</td><td>—</td><td><strong>✓</strong></td></tr>
+<tr><td>Outbound transformer layer (auto typing, idempotency, recording)</td><td>—</td><td><strong>✓</strong></td></tr>
+<tr><td>Composer middleware bundles with error boundaries</td><td>—</td><td><strong>✓</strong></td></tr>
+<tr><td>Pre-handler dispatch table (route)</td><td>—</td><td><strong>✓</strong></td></tr>
+<tr><td>State-carrying typed dialogues with transitions and timeout</td><td>—</td><td><strong>✓</strong></td></tr>
+<tr><td>Scoped middleware chains</td><td>—</td><td><strong>✓</strong></td></tr>
+<tr><td>Outbound rate-limit transformer</td><td>partial</td><td><strong>✓</strong></td></tr>
+<tr><td>Fluent Reply builder</td><td>partial</td><td><strong>✓</strong></td></tr>
+<tr><td>Graceful shutdown API</td><td>partial</td><td><strong>✓</strong></td></tr>
+<tr><td>First-party plugin registry</td><td>partial</td><td><strong>✓</strong></td></tr>
+<tr><td>FSM storage (Memory/JSON/Redis) + TTL</td><td>partial</td><td><strong>✓</strong></td></tr>
+<tr><td>Network-free scripted testing</td><td>partial</td><td><strong>✓</strong></td></tr>
+<tr><td>Bot API 2026 methods</td><td>—</td><td><strong>✓</strong></td></tr>
 </table>
 <p>
-  The table reflects the state at the time of writing: the dashes mark features
-  that exist nowhere in the Python ecosystem but are native to SwiftBot, ported
-  from the Rust/TypeScript/Go reference implementations.
+  The table reflects the state at the time of writing: dashes mark capabilities
+  that exist nowhere else in the Python ecosystem. SwiftBot is the only
+  framework that combines all of them in a single, idiomatic package.
 </p>
 </section>
 
 <!-- ============ MIGRATE ============ -->
 <section id="migrate">
-<h2><a href="#migrate">Upgrade Notes — v1.4 → v1.5</a></h2>
+<h2><a href="#migrate">Upgrade Notes — v1.5 → v1.6</a></h2>
 <p>
-  Everything in v1.4 remains intact. v1.5 adds modules and new methods; nothing
-  is removed or renamed. Two notes for upgraders:
+  Everything in v1.5 remains intact. v1.6 adds modules and new methods; nothing
+  is removed or renamed. A few notes for upgraders:
 </p>
 <ul>
-  <li style="margin-left:22px"><p style="margin:0"><code>bot.use()</code> now accepts a <code>Composer</code> directly — existing
-      middleware classes are unaffected. When a <code>Composer</code> has no error boundary,
-      exceptions propagate to your central exception handler as before.</p></li>
-  <li style="margin-left:22px"><p style="margin:0">If you mount a <code>Pipeline</code> alongside <code>@bot.on(...)</code>
-      handlers, pipeline branches take precedence for matching updates
-      (first-match-wins), so register broad fall-back branches last.</p></li>
+  <li style="margin-left:22px"><p style="margin:0">When a user has an active <a href="#dialogue">dialogue</a>, their update is
+      consumed by it before any <code>@bot.on(...)</code> handler runs — if you use
+      dialogues, register step handlers against <code>F.text</code> carefully and use
+      <code>Dialogue.end</code> to release users back to normal routing.</p></li>
+  <li style="margin-left:22px"><p style="margin:0">Middleware now runs even when no handler matches an update, so that
+      middlewares such as <code>CommandsMiddleware</code> can observe and handle
+      unknown <code>/command</code> messages. Your unmatched updates still reach the
+      <a href="#fallback">fallback</a> handler afterwards as before.</p></li>
+  <li style="margin-left:22px"><p style="margin:0">A <a href="#throttle">throttle</a> transformer applies to all outgoing API calls
+      once mounted via <code>bot.api.config.use()</code> — place it last so every
+      other transformer sees unthrottled payloads.</p></li>
 </ul>
 </section>
 
@@ -754,11 +947,11 @@ update ──▶ parse ──▶ WorkerPool (drain on stop)
   SwiftBot is developed openly at
   <a href="https://github.com/Arjun-M/SwiftBot">github.com/Arjun-M/SwiftBot</a>.
   All work ships on feature branches with a pull request to <code>main</code> —
-  the v1.5 release lives on
-  <code>features/v1.5-standout</code> (PR #3). Licensed under the MIT License.
+  the v1.6 release lives on
+  <code>features/v1.6-next</code> (PR #4). Licensed under the MIT License.
 </p>
 <p style="color:var(--muted); font-size:13.5px">
-  v1.5 · documentation generated August 2026 · © Arjun-M / SwiftBot contributors
+  v1.6 · documentation generated August 2026 · © Arjun-M / SwiftBot contributors
 </p>
 
 </section>

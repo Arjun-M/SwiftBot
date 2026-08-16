@@ -1,16 +1,10 @@
 """
-Pipeline — a declarative, dependency-injected handler tree inspired by Rust's
-``teloxide``/``dptree``.
+Pipeline — a declarative, dependency-injected handler tree.
 
 Where ordinary handlers receive only a ``Context`` object, a ``Pipeline`` lets
 handlers declare the dependencies they need, and the pipeline injects them
 automatically. Handlers can be grouped into typed branches guarded by filters,
 forming a chain-of-responsibility tree that is easy to compose and test.
-
-Inspired by:
-- teloxide ``dptree`` — functional chain of responsibility with typed
-  dependencies (https://github.com/teloxide/teloxide)
-- dptree ``deps![...]`` — dependency injection via a type registry
 
 Example::
 

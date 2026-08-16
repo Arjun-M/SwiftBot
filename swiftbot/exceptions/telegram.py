@@ -3,7 +3,7 @@ Typed Telegram Bot API error hierarchy.
 
 Instead of raising a bare ``Exception`` for every API failure, the framework
 now maps Telegram API error codes and descriptions to typed exceptions that
-users can catch precisely, exactly like aiogram / python-telegram-bot do.
+users can catch precisely, with no string parsing or status-code branching.
 
 Usage:
     try:

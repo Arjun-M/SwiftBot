@@ -85,7 +85,7 @@ class TelegramAPI:
         self.pool = connection_pool
         self.base_url = f"{base_url}/bot{token}"
 
-        # Transformer stack (grammy-style outbound call interceptors).
+        # Transformer stack — outbound call interceptors.
         from ..transformer import TransformerConfig
         self.config = TransformerConfig()
 
@@ -110,7 +110,7 @@ class TelegramAPI:
         # Remove None values
         params = {k: v for k, v in params.items() if v is not None}
 
-        # --- grammy-style transformer layer: intercept every outbound call ---
+        # --- transformer layer: intercept every outbound call ---
         from ..transformer import _RecorderResult, _RecorderError, TransformerConfig
         if isinstance(self.config, TransformerConfig) and self.config.transformers:
             try:
