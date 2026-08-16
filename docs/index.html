@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SwiftBot — The Telegram bot framework that learned from other languages</title>
+<meta name="description" content="SwiftBot documentation: middleware bundles with error boundaries, declarative command specs, outbound transformers, dependency-injected pipelines, typed wizards, and first-party plugins — the best of teloxide, grammy and telebot, brought to Python.">
+<style>
+:root {
+  --bg: #0e1014;
+  --panel: #161922;
+  --panel2: #1d212c;
+  --accent: #4f9eff;
+  --accent2: #7d5fff;
+  --green: #3ddc97;
+  --text: #d7dbe4;
+  --muted: #8b93a5;
+  --border: #272c39;
+  --code-bg: #0b0d11;
+  --red: #ff6b6b;
+  --orange: #ffb454;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+}
+code, pre { font-family: "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace; }
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  overflow-x: auto;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #cdd3e0;
+}
+code {
+  background: rgba(79,158,255,.12);
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 0.88em;
+  color: #9fc3ff;
+}
+pre code { background: none; padding: 0; color: inherit; }
+
+/* Layout */
+.wrap { display: flex; min-height: 100vh; }
+nav.sidebar {
+  width: 260px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 24px 18px;
+  flex-shrink: 0;
+}
+nav.sidebar .brand {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+nav.sidebar .brand-sub { font-size: 11.5px; color: var(--muted); margin-bottom: 22px; }
+nav.sidebar h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--muted);
+  margin: 20px 0 6px;
+}
+nav.sidebar a {
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13.5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: background .15s;
+}
+nav.sidebar a:hover { background: var(--panel2); color: var(--accent); }
+
+main { flex: 1; max-width: 900px; padding: 0 44px 80px; }
+.hero {
+  padding: 72px 0 40px;
+}
+.hero h1 {
+  font-size: 42px;
+  line-height: 1.15;
+  letter-spacing: -1px;
+  margin-bottom: 16px;
+}
+.hero h1 span { color: var(--accent); }
+.hero p.lead { font-size: 18px; color: var(--muted); max-width: 680px; }
+.badges { margin-top: 22px; display: flex; gap: 10px; flex-wrap: wrap; }
+.badge {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.badge strong { color: var(--green); font-weight: 700; }
+
+h2 {
+  font-size: 28px;
+  letter-spacing: -0.5px;
+  margin: 64px 0 14px;
+  padding-top: 8px;
+  scroll-margin-top: 32px;
+}
+h2 a { color: inherit; text-decoration: none; }
+h3 { font-size: 19px; margin: 30px 0 10px; color: #fff; }
+p { margin: 10px 0; max-width: 78ch; }
+p a { color: var(--accent); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 18px 0 28px;
+  font-size: 14px;
+}
+th, td {
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 12px;
+  vertical-align: top;
+}
+th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .6px; }
+td code { font-size: 12.5px; }
+
+.kw { color: var(--accent2); }
+.str { color: var(--green); }
+.cmt { color: var(--muted); font-style: italic; }
+.fn { color: #ffd36b; }
+.num { color: var(--orange); }
+
+blockquote {
+  border-left: 3px solid var(--accent2);
+  background: var(--panel);
+  padding: 14px 18px;
+  border-radius: 0 10px 10px 0;
+  margin: 18px 0;
+  font-size: 14.5px;
+  color: var(--muted);
+}
+blockquote p { margin: 0; }
+
+.note {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 14px;
+  margin: 18px 0;
+}
+.note b { color: var(--orange); }
+
+@media (max-width: 860px) {
+  .wrap { flex-direction: column; }
+  nav.sidebar { width: 100%; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--border); }
+  main { padding: 0 20px 80px; }
+  .hero h1 { font-size: 32px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="sidebar">
+  <div class="brand">SwiftBot</div>
+  <div class="brand-sub">Docs · v1.5.0 · Telegram Bot Framework</div>
+  <h4>Getting Started</h4>
+  <a href="#intro">Why SwiftBot</a>
+  <a href="#install">Installation</a>
+  <a href="#quickstart">Quickstart</a>
+  <a href="#research">The Research Behind It</a>
+  <h4>v1.5 Standout Features</h4>
+  <a href="#pipeline">Pipelines + Dependency Injection</a>
+  <a href="#commands">Declarative BotCommands</a>
+  <a href="#transformers">Outbound Transformers</a>
+  <a href="#composer">Composer + Error Boundaries</a>
+  <a href="#route">Dispatch Routing</a>
+  <a href="#wizards">Typed Wizards</a>
+  <a href="#shutdown">Graceful Shutdown</a>
+  <a href="#plugins">First-Party Plugins</a>
+  <a href="#f">F Filter Algebra</a>
+  <h4>Reference</h4>
+  <a href="#api">API Reference</a>
+  <a href="#arch">Architecture</a>
+  <a href="#compare">Comparison Table</a>
+  <a href="#migrate">Upgrade Notes</a>
+  <a href="#github">Source &amp; License</a>
+</nav>
+
+<main>
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="intro">
+  <h1>The Telegram framework that <span>learned from other languages.</span></h1>
+  <p class="lead">
+    Python's Telegram SDKs are great — but they all converge on the same
+    imperative pattern. SwiftBot studied <strong>teloxide</strong> (Rust),
+    <strong>grammy</strong> (TypeScript), <strong>telebot</strong> (Go) and
+    <strong>kotlin-telegram-bot</strong>, and ported their best ideas into
+    idiomatic Python: declarative pipelines with dependency injection, typed
+    command specs, an outbound transformer layer, middleware bundles with error
+    boundaries, and typed wizards.
+  </p>
+  <div class="badges">
+    <div class="badge"><strong>133 tests</strong> · 0 warnings</div>
+    <div class="badge">Async · type-friendly · dependency-free core</div>
+    <div class="badge">Bot API 2026 support</div>
+    <div class="badge">MIT — Arjun-M/SwiftBot</div>
+  </div>
+</section>
+
+<!-- ============ INSTALL ============ -->
+<section id="install">
+<h2><a href="#install">Installation</a></h2>
+<pre><code>git clone https://github.com/Arjun-M/SwiftBot.git
+cd SwiftBot
+pip install httpx[http2] aiohttp        # full runtime deps
+pip install -e .                         # optional: install as editable package</code></pre>
+<p>Optional dependencies per feature: <code>redis</code> for <code>RedisStorage</code>,
+<code>h2</code> for HTTP/2 (auto-installed by the bracket syntax above).</p>
+
+<h3>Minimal runnable bot</h3>
+<pre><code><span class="kw">from</span> swiftbot <span class="kw">import</span> SwiftBot
+<span class="kw">from</span> swiftbot.types <span class="kw">import</span> Message
+
+bot = SwiftBot(token=<span class="str">"TOKEN:HERE"</span>)
+
+@bot.on(Message(text=<span class="str">"/start"</span>))
+<span class="kw">async def</span> <span class="fn">start</span>(ctx):
+    <span class="kw">await</span> ctx.reply(<span class="str">"Hi! Send /name &lt;you&gt; to introduce yourself."</span>)
+
+bot.run()</code></pre>
+
+<h3 id="quickstart">Quickstart — the whole v1.5 experience in one file</h3>
+<pre><code><span class="kw">from</span> swiftbot <span class="kw">import</span> SwiftBot, BotCommands, Composer, F, plugins
+<span class="kw">from</span> swiftbot.commands <span class="kw">import</span> CommandsMiddleware
+
+<span class="kw">class</span> <span class="fn">Cmd</span>(BotCommands):
+    start = <span class="str">"/start"</span>                     <span class="cmt"># declarative command spec</span>
+    name = <span class="str">"/name &lt;first&gt; &lt;last&gt;"</span>        <span class="cmt"># parsed args, typed</span>
+    help_ = <span class="str">"/help"</span>                      <span class="cmt"># auto-generated from the class</span>
+
+bot = SwiftBot(token=<span class="str">"TOKEN:HERE"</span>)
+bot.use(CommandsMiddleware(Cmd))         <span class="cmt"># /help appears for free</span>
+
+<span class="cmt"># Anti-spam + per-user rate limit, as first-party middleware bundles</span>
+<span class="kw">from</span> swiftbot.plugins <span class="kw">import</span> spam_deflector, session_limiter
+bot.use(spam_deflector(threshold=<span class="num">15</span>))
+bot.use(session_limiter(min_interval=<span class="num">0.5</span>))
+
+<span class="cmt"># F filter algebra — compose like aiogram, on any update</span>
+@bot.on(F.text &amp; F.private &amp; ~F.forwarded)
+<span class="kw">async def</span> <span class="fn">echo</span>(ctx):
+    <span class="kw">await</span> ctx.reply(<span class="str">f"You said: {ctx.text}"</span>)
+
+<span class="cmt"># A scripted test — no network, no Telegram</span>
+<span class="kw">from</span> swiftbot.testing <span class="kw">import</span> TestClient
+<span class="kw">async def</span> <span class="fn">test_echo</span>():
+    <span class="kw">async with</span> TestClient(bot) <span class="kw">as</span> tc:
+        <span class="kw">await</span> tc.send_update({<span class="str">"update_id"</span>: <span class="num">1</span>,
+            <span class="str">"message"</span>: {<span class="str">"message_id"</span>: <span class="num">1</span>, <span class="str">"date"</span>: <span class="num">0</span>,
+                        <span class="str">"chat"</span>: {<span class="str">"id"</span>: <span class="num">42</span>, <span class="str">"type"</span>: <span class="str">"private"</span>},
+                        <span class="str">"from"</span>: {<span class="str">"id"</span>: <span class="num">7</span>, <span class="str">"is_bot"</span>: False, <span class="str">"first_name"</span>: <span class="str">"U"</span>},
+                        <span class="str">"text"</span>: <span class="str">"Hello world"</span>}})
+        <span class="kw">assert</span> tc.outgoing[<span class="num">0</span>][<span class="str">"params"</span>][<span class="str">"text"</span>] == <span class="str">"You said: Hello world"</span></code></pre>
+</section>
+
+<!-- ============ RESEARCH ============ -->
+<section id="research">
+<h2><a href="#research">The Research Behind v1.5</a></h2>
+<p>
+  Rather than inventing features in a vacuum, this release was driven by a
+  systematic study of what developers love in Telegram SDKs for other
+  languages — and which of those ideas are missing from every Python package.
+</p>
+
+<table>
+<tr><th>Language / SDK</th><th>Standout idea</th><th>In SwiftBot as</th></tr>
+<tr>
+  <td><strong>Rust · teloxide</strong><br>(and its <code>dptree</code> crate)</td>
+  <td>Declarative handler trees with typed dependency injection — handlers declare the
+      dependencies they need and the framework supplies them; <code>BotCommands</code> derive
+      parses commands into typed enums with auto-generated <code>/help</code>.</td>
+  <td><code><a href="#pipeline">Pipeline</a></code> + DI,
+      <code><a href="#commands">BotCommands</a></code></td>
+</tr>
+<tr>
+  <td><strong>TypeScript · grammy</strong></td>
+  <td><code>bot.api.config.use()</code> transformer plugins that intercept <em>outbound</em> API
+      calls (auto typing, dry-run, recording); <code>Composer</code> bundles with
+      <code>.catch()</code> error boundaries; <code>bot.route</code> pre-handler dispatch.</td>
+  <td><code><a href="#transformers">TransformerConfig</a></code>,
+      <code><a href="#composer">Composer</a></code>, <code><a href="#route">route()</a></code></td>
+</tr>
+<tr>
+  <td><strong>Go · telebot</strong><br>(tucnak)</td>
+  <td>Middlewares registered globally, per-group, or per-handler; built-in
+      <code>Whitelist</code>, <code>Logger</code>, <code>AutoRespond</code> presets.</td>
+  <td>Middleware layer + <code><a href="#plugins">plugins</a></code> registry</td>
+</tr>
+<tr>
+  <td><strong>Kotlin · kotlin-telegram-bot</strong></td>
+  <td>DSL builders (typed keyboards, receiver-based configuration lambdas).</td>
+  <td>Builder-style APIs (<code>Pipeline.deps().handle()</code>, wizard decorators)</td>
+</tr>
+</table>
+
+<blockquote>
+<p>Five years after the first python-telegram-bot release, no Python Telegram
+SDK has a dependency-injection handler tree, an outbound transformer layer, or
+an error-boundary composer — three of the features non-Python developers cite
+most when explaining why they would switch languages for a bot. SwiftBot
+changes that.</p>
+</blockquote>
+</section>
+
+<!-- ============ PIPELINE ============ -->
+<section id="pipeline">
+<h2><a href="#pipeline">Pipelines + Dependency Injection</a></h2>
+<p>
+  In every Python framework, handlers receive exactly one object: the context.
+  Need a database? A config? An LLM client? You reach for globals or closures.
+  teloxide solved this with <code>dptree</code>: handler functions declare the
+  dependencies they need by parameter name, and the framework injects them.
+  SwiftBot's <code>Pipeline</code> brings the same model to Python.
+</p>
+<pre><code><span class="kw">from</span> swiftbot.pipeline <span class="kw">import</span> Pipeline
+<span class="kw">from</span> swiftbot.filters <span class="kw">import</span> F
+
+<span class="kw">async def</span> <span class="fn">stats</span>(ctx, db, redis):          <span class="cmt"># ctx, db and redis injected by name</span>
+    count = <span class="kw">await</span> db.count_users()
+    <span class="kw">await</span> ctx.reply(<span class="str">f"{count} users · {await redis.ping()}"</span>)
+
+pipe = Pipeline()
+pipe.deps(db=my_postgres).deps(redis=my_redis)
+pipe.handle(F.command(<span class="str">"stats"</span>), stats)
+pipe.handle(F.text, fallback_handler)
+
+bot.pipeline(pipe)                        <span class="cmt"># mount — the pipeline is one middleware stage</span></code></pre>
+<p>
+  Branches are evaluated in registration order with first-match-wins semantics
+  (toggle via <code>Pipeline(first=False)</code> to run all matches). If a handler
+  declares a dependency that was never registered, the pipeline raises
+  <code>PipelineDependencyMissing</code> immediately — failures are loud, never silent.
+  Framework parameters <code>ctx</code>, <code>bot</code> and <code>match</code> (the
+  last regex match) are always available and never taken from the registry.
+</p>
+</section>
+
+<!-- ============ COMMANDS ============ -->
+<section id="commands">
+<h2 id="commands"><a href="#commands">Declarative BotCommands</a></h2>
+<p>
+  teloxide's <code>#[derive(BotCommands)]</code> is one of its most-loved features:
+  commands are declared once as a spec, arguments are parsed automatically, and a
+  correct <code>/help</code> is generated from descriptions. SwiftBot's
+  <code>BotCommands</code> does the same in Python — no decorators needed, and
+  names that collide with built-ins (<code>Cmd.name</code>, <code>Cmd.help</code>)
+  are handled safely.
+</p>
+<pre><code><span class="kw">from</span> swiftbot.commands <span class="kw">import</span> BotCommands, CommandsMiddleware
+
+<span class="kw">class</span> <span class="fn">Cmd</span>(BotCommands):
+    start = <span class="str">"/start"</span>
+    name = <span class="str">"/name &lt;first&gt; &lt;last&gt;"</span>
+    age = <span class="str">"/age &lt;years:number&gt;"</span>          <span class="cmt"># type coercions: int, float, bool</span>
+    help_ = <span class="str">"/help | /h"</span>                 <span class="cmt"># aliases</span>
+
+bot.use(CommandsMiddleware(Cmd))
+
+<span class="cmt"># The spec doubles as a filter — register handlers against commands directly:</span>
+@bot.on(Cmd.name)                        <span class="cmt"># Cmd.name is a callable filter + parsed spec</span>
+<span class="kw">async def</span> <span class="fn">greet</span>(ctx):
+    parsed = Cmd.parse(ctx.text)          <span class="cmt"># ParsedCommand(name='name', args=['Arjun','M'])</span>
+    <span class="kw">await</span> ctx.reply(<span class="str">f"Hello, {parsed.args[0]}!"</span>)</code></pre>
+<p>
+  <code>CommandsMiddleware</code> intercepts <code>/help</code> and renders a table of every
+  declared command, its usage line and arguments — the same contract a typed CLI
+  gives you, in a chat window.
+</p>
+</section>
+
+<!-- ============ TRANSFORMERS ============ -->
+<section id="transformers">
+<h2><a href="#transformers">Outbound Transformers</a></h2>
+<p>
+  Middleware intercepts <em>incoming</em> updates. Who intercepts <em>outgoing</em> API
+  calls? grammy did, and it powers half their plugin ecosystem.
+  <code>bot.api.config.use()</code> wraps every call through
+  <code>TelegramAPI._request</code> with a stack of transformers
+  <code>(method, payload) → payload</code>.
+</p>
+<pre><code><span class="kw">from</span> swiftbot.transformer <span class="kw">import</span> (
+    auto_typing, call_logger, idempotency_guard, Recorder, record
+)
+
+<span class="cmt"># Send the typing indicator while an upload runs:</span>
+bot.api.config.use(auto_typing(interval=<span class="num">5.0</span>))
+
+<span class="cmt"># Make every sendMessage idempotent for 30 seconds:</span>
+bot.api.config.use(idempotency_guard())
+
+<span class="cmt"># Log every outbound call:</span>
+bot.api.config.use(call_logger(<span class="kw">lambda</span> m, p: <span class="fn">print</span>(m, list(p))))
+
+<span class="cmt"># Patch defaults into every call (e.g. force MarkdownV2):</span>
+<span class="kw">from</span> swiftbot.transformer <span class="kw">import</span> payload_patch
+bot.api.config.use(payload_patch(parse_mode=<span class="str">"MarkdownV2"</span>))</code></pre>
+
+<h3>The Recorder — test against scripted Telegram</h3>
+<pre><code><span class="kw">from</span> swiftbot.transformer <span class="kw">import</span> Recorder
+
+rec = Recorder()
+rec.script(<span class="str">"getMe"</span>, result={<span class="str">"id"</span>: <span class="num">1</span>, <span class="str">"is_bot"</span>: True, <span class="str">"first_name"</span>: <span class="str">"Bot"</span>})
+rec.script(<span class="str">"sendMessage"</span>, result={<span class="str">"message_id"</span>: <span class="num">42</span>, <span class="str">"text"</span>: <span class="str">"ok"</span>})
+
+bot.api.config.use(rec)
+
+result = <span class="kw">await</span> bot.api.send_message(<span class="num">1</span>, text=<span class="str">"hi"</span>)   <span class="cmt"># no network — returns {"message_id":42}</span>
+<span class="kw">assert</span> rec.calls[<span class="num">0</span>][<span class="str">"method"</span>] == <span class="str">"sendMessage"</span>      <span class="cmt"># every call is recorded</span></code></pre>
+<p>
+  Combined with <code>swiftbot.testing</code> (v1.4's FakePool + TestClient), SwiftBot now
+  offers the strongest network-free testing story of any Python Telegram framework.
+</p>
+</section>
+
+<!-- ============ COMPOSER ============ -->
+<section id="composer">
+<h2><a href="#composer">Composer — Middleware Bundles with Error Boundaries</a></h2>
+<p>
+  Middleware scattered across <code>bot.use()</code> calls is hard to reason about.
+  grammy's <code>Composer</code> lets you package middleware into modules and — most
+  importantly — attach an <em>error boundary</em> to a bundle so that one misbehaving
+  plugin can never crash the whole bot.
+</p>
+<pre><code><span class="kw">from</span> swiftbot <span class="kw">import</span> Composer
+
+bundle = Composer()
+
+<span class="kw">async def</span> <span class="fn">metrics</span>(ctx, next_handler):
+    t0 = time.monotonic()
+    <span class="kw">await</span> next_handler()
+    record_metric(time.monotonic() - t0)
+
+<span class="kw">async def</span> <span class="fn">on_error</span>(ctx, exc):            <span class="cmt"># this boundary isolates the bundle</span>
+    <span class="kw">await</span> alert_channel.send(<span class="str">f"Plugin error: {exc!r}"</span>)
+
+bundle.use(metrics, plugins.SessionLimiter())
+bundle.catch(on_error)
+
+bot.use(bundle)                          <span class="cmt"># an exception inside this bundle never reaches others</span></code></pre>
+<p>
+  Composers nest freely — a bundle can contain other bundles, each with its own
+  boundary. Without a boundary, exceptions propagate exactly once, up the chain,
+  so they are always visible to your central exception handler rather than being
+  silently swallowed.
+</p>
+</section>
+
+<!-- ============ ROUTE ============ -->
+<section id="route">
+<h2><a href="#route">Dispatch Routing</a></h2>
+<p>
+  grammy's <code>bot.route</code> routes an update to a middleware chain <em>before</em>
+  any handler is evaluated. SwiftBot's <code>bot.route()</code> does the same: pick a
+  handler stage per update kind (or any boolean predicate on the raw update),
+  ideal for separating business-logic modules, admin gates, and per-chat
+  pipelines.
+</p>
+<pre><code><span class="kw">async def</span> <span class="fn">admin_only</span>(ctx, next_handler):
+    <span class="kw">if</span> ctx.user.id <span class="kw">not in</span> ADMIN_IDS:
+        <span class="kw">return</span>
+    <span class="kw">await</span> next_handler()
+
+bot.route({
+    <span class="str">"message"</span>: Composer(admin_only),
+    <span class="str">"callback_query"</span>: Composer(plugins.idempotency()),
+    <span class="str">"poll"</span>: Composer(CheckpointRecorder()),
+})</code></pre>
+</section>
+
+<!-- ============ WIZARDS ============ -->
+<section id="wizards">
+<h2><a href="#wizards">Typed Wizards</a></h2>
+<p>
+  aiogram's FSM gives you string states and a free-form data dict. teloxide goes
+  further: states carry their own typed data. SwiftBot's <code>Wizard</code> takes the
+  middle path that fits Python best — steps are plain async functions, collected
+  answers accumulate into a typed result object, and the wizard is
+  storage-agnostic (Memory, JSON file, or Redis).
+</p>
+<pre><code>survey = bot.wizard(<span class="str">"survey"</span>, storage=<span class="kw">None</span>)     <span class="cmt"># falls back to the bot's storage</span>
+
+@survey.step(<span class="str">"ask_name"</span>)
+<span class="kw">async def</span> <span class="fn">ask_name</span>(ctx):
+    <span class="kw">await</span> ctx.reply(<span class="str">"What's your name?"</span>)
+
+@survey.step(<span class="str">"ask_age"</span>)
+<span class="kw">async def</span> <span class="fn">ask_age</span>(ctx):
+    <span class="kw">await</span> ctx.reply(<span class="str">"And your age?"</span>)
+
+@survey.finish
+<span class="kw">async def</span> <span class="fn">done</span>(ctx, data):                    <span class="cmt"># data = {"name": ..., "age": ...}</span>
+    <span class="kw">await</span> ctx.reply(<span class="str">f"Thanks {data['name']}, registered!"</span>)
+
+<span class="cmt"># Advance the wizard from any handler:</span>
+@bot.on(Cmd.start)
+<span class="kw">async def</span> <span class="fn">begin</span>(ctx):
+    <span class="kw">await</span> survey.enter(ctx)
+
+@bot.on(F.text)
+<span class="kw">async def</span> <span class="fn">advance</span>(ctx):
+    <span class="kw">await</span> survey.step_forward(ctx, answer=ctx.text)</code></pre>
+</section>
+
+<!-- ============ SHUTDOWN ============ -->
+<section id="shutdown">
+<h2><a href="#shutdown">Graceful Shutdown</a></h2>
+<p>
+  teloxide's <code>enable_ctrlc_handler()</code> made clean exits trivial in Rust.
+  <code>bot.run_shutdown()</code> is the Python equivalent: it installs signal handlers
+  (SIGINT / SIGTERM), drains the worker pool so in-flight updates finish, and
+  returns — no deadlocks, no lost updates.
+</p>
+<pre><code><span class="kw">async def</span> <span class="fn">main</span>():
+    <span class="kw">await</span> bot.run_shutdown(timeout=<span class="num">30.0</span>)      <span class="cmt"># press Ctrl+C — workers drain, then exit</span></code></pre>
+</section>
+
+<!-- ============ PLUGINS ============ -->
+<section id="plugins">
+<h2><a href="#plugins">First-Party Plugins</a></h2>
+<p>
+  telebot ships a handful of built-in middlewares (<code>Logger</code>,
+  <code>Whitelist</code>, <code>AutoRespond</code>) and tells users to pick them up
+  freely. SwiftBot makes that an official, typed registry under
+  <code>swiftbot.plugins</code> — no more copy-pasting middleware snippets from
+  Stack Overflow.
+</p>
+<table>
+<tr><th>Plugin</th><th>What it does</th><th>Usage</th></tr>
+<tr><td><code>spam_deflector</code></td><td>Drops users who exceed <em>N</em> messages within a sliding window</td><td><code>bot.use(spam_deflector(threshold=15))</code></td></tr>
+<tr><td><code>session_limiter</code></td><td>Per-user minimum interval between messages (anti-flood)</td><td><code>bot.use(session_limiter(min_interval=0.5))</code></td></tr>
+<tr><td><code>idempotency</code></td><td>Dedupe the same update within a window (redeliveries, retries)</td><td><code>bot.use(idempotency(window=5.0))</code></td></tr>
+<tr><td><code>whitelist</code></td><td>Silently drop every update not from listed user IDs</td><td><code>bot.use(whitelist(user_ids={123}))</code></td></tr>
+</table>
+<p>
+  The <code>idempotency_guard()</code> transformer (see
+  <a href="#transformers">Transformers</a>) complements the plugin version by making
+  specific <em>outbound</em> calls idempotent for a window — useful for payment
+  confirmations and notification sends.
+</p>
+</section>
+
+<!-- ============ F ALGEBRA ============ -->
+<section id="f">
+<h2><a href="#f">The <code>F</code> Filter Algebra</a></h2>
+<p>
+  aiogram's <code>F</code> is the most ergonomic filter syntax in the Python
+  ecosystem. SwiftBot's <code>F</code> preset factory builds fresh, reusable
+  <code>Filter</code> objects with combinators, on top of the framework's existing
+  filter classes.
+</p>
+<pre><code><span class="kw">from</span> swiftbot <span class="kw">import</span> F
+
+@bot.on(F.text &amp; F.private &amp; ~F.forwarded)
+<span class="kw">async def</span> <span class="fn">a</span>(ctx): ...
+
+@bot.on(F.photo | F.video)
+<span class="kw">async def</span> <span class="fn">media</span>(ctx): ...
+
+@bot.on(F.command(<span class="str">"start"</span>, <span class="str">"help"</span>))
+<span class="kw">async def</span> <span class="fn">cmd</span>(ctx): ...
+
+@bot.on(F.regex(<span class="str">r"^ping$"</span>))
+<span class="kw">async def</span> <span class="fn">ping</span>(ctx): ...
+
+<span class="cmt"># Available presets: text, private, group, supergroup, channel, forwarded, reply,</span>
+<span class="cmt"># photo, video, audio, document, voice, sticker, animation, video_note, location, contact, media</span></code></pre>
+</section>
+
+<!-- ============ API REFERENCE ============ -->
+<section id="api">
+<h2><a href="#api">API Reference (v1.5 additions)</a></h2>
+
+<h3><code>swiftbot.pipeline.Pipeline</code></h3>
+<table>
+<tr><th>Member</th><th>Description</th></tr>
+<tr><td><code>Pipeline(first=True)</code></td><td>Create a pipeline; <code>first=False</code> runs all matching branches.</td></tr>
+<tr><td><code>.deps(**deps)</code></td><td>Register injectable dependencies. Returns <code>self</code> for chaining.</td></tr>
+<tr><td><code>.handle(filter_fn, handler)</code></td><td>Add a filter-guarded handler; returns the handler so decorators work.</td></tr>
+<tr><td><code>.get_dep(name)</code></td><td>Retrieve a registered dependency (or <code>None</code>).</td></tr>
+<tr><td><code>.process(ctx, bot)</code></td><td>Run matching branches; returns <code>True</code> when handled. Raises
+    <code>PipelineDependencyMissing</code> for unregistered params.</td></tr>
+</table>
+
+<h3><code>swiftbot.commands.BotCommands</code></h3>
+<table>
+<tr><th>Member</th><th>Description</th></tr>
+<tr><td><code>class Cmd(BotCommands): name = "..."; ...</code></td><td>Declare specs as class-level strings; arg placeholders
+    <code>&lt;name:type&gt;</code> coerce to <code>int | float | bool</code>.</td></tr>
+<tr><td><code>Cmd.some_command</code></td><td>Returns a callable filter + spec object (works with <code>@bot.on(...)</code>).</td></tr>
+<tr><td><code>Cmd.parse(text)</code></td><td>Parses <code>ParsedCommand(name, args)</code> from a command string; <code>None</code> if unmatched.</td></tr>
+<tr><td><code>Cmd.help_text</code></td><td>Auto-generated help table of all declared commands.</td></tr>
+<tr><td><code>CommandsMiddleware(Cmd)</code></td><td>Middleware that answers <code>/help</code> from the spec. Use via <code>bot.use()</code>.</td></tr>
+</table>
+
+<h3><code>swiftbot.transformer</code></h3>
+<table>
+<tr><th>Member</th><th>Description</th></tr>
+<tr><td><code>bot.api.config.use(transformer)</code></td><td>Push a <code>(method, payload) → payload</code> transformer onto the outbound stack.</td></tr>
+<tr><td><code>auto_typing(interval=5.0)</code></td><td>Sends typing indicators while long calls run.</td></tr>
+<tr><td><code>idempotency_guard()</code></td><td>Makes calls idempotent inside a window (memoised by method+payload hash).</td></tr>
+<tr><td><code>call_logger(fn)</code></td><td>Calls <code>fn(method, payload)</code> for every request.</td></tr>
+<tr><td><code>payload_patch(**defaults)</code></td><td>Merges defaults into every payload.</td></tr>
+<tr><td><code>Recorder</code> / <code>record()</code></td><td>Script results or errors per method; record every call for assertions. See the
+    <a href="#transformers">Recorder section</a>.</td></tr>
+</table>
+
+<h3><code>swiftbot.composer.Composer</code></h3>
+<table>
+<tr><th>Member</th><th>Description</th></tr>
+<tr><td><code>Composer(*middleware)</code></td><td>Build a bundle from any number of middleware callables or nested Composers.</td></tr>
+<tr><td><code>.use(*mw)</code></td><td>Append middleware; returns <code>self</code>.</td></tr>
+<tr><td><code>.catch(handler)</code></td><td>Set the error boundary: <code>async (ctx, exc) → None</code>. Exceptions inside the
+    bundle are consumed here and never reach sibling middleware.</td></tr>
+<tr><td><code>.on_exception(handler)</code></td><td>Alias of <code>.catch</code> (matches grammy ergonomics).</td></tr>
+</table>
+
+<h3><code>swiftbot.wizard.Wizard</code></h3>
+<table>
+<tr><th>Member</th><th>Description</th></tr>
+<tr><td><code>bot.wizard(name, storage)</code></td><td>Register a named wizard (defaults to the bot's storage).</td></tr>
+<tr><td><code>@wiz.step("name")</code></td><td>Decorate an <code>async (ctx)</code> function as a step.</td></tr>
+<tr><td><code>@wiz.finish</code></td><td>Decorate <code>async (ctx, data)</code> — called with the accumulated answers.</td></tr>
+<tr><td><code>@wiz.on_enter / @wiz.on_leave</code></td><td>Optional hooks: <code>async (ctx)</code> and <code>async (ctx, data)</code>.</td></tr>
+<tr><td><code>await wiz.enter / step_forward / exit</code></td><td>Control flow; <code>current_step(ctx)</code>, <code>current_data(ctx)</code> for introspection.</td></tr>
+<tr><td><code>ctx.wizard</code></td><td><code>WizardAccessor</code> — <code>ctx.wizard.current</code> and <code>ctx.wizard.data</code>.</td></tr>
+</table>
+
+<h3><code>swiftbot.client.SwiftBot</code> — new methods</h3>
+<table>
+<tr><th>Member</th><th>Description</th></tr>
+<tr><td><code>.route(table)</code></td><td>Pre-handler dispatch table: update kind → middleware (Composer or callable).</td></tr>
+<tr><td><code>.pipeline(pipe)</code></td><td>Mount a <code>Pipeline</code>; no args creates and mounts a fresh one.</td></tr>
+<tr><td><code>.wizard(name, storage)</code></td><td>Register and return a <code>Wizard</code>.</td></tr>
+<tr><td><code>await .run_shutdown(timeout)</code></td><td>Install SIGINT/SIGTERM handlers, drain workers, exit cleanly.</td></tr>
+<tr><td><code>ctx.command</code></td><td>Set by <code>CommandsMiddleware</code> — the parsed <code>ParsedCommand</code>, or <code>None</code>.</td></tr>
+</table>
+
+<h3><code>swiftbot.plugins</code></h3>
+<table>
+<tr><th>Factory</th><th>Description</th></tr>
+<tr><td><code>spam_deflector(threshold=10, window=60.0)</code></td><td>Drop message floods per user.</td></tr>
+<tr><td><code>session_limiter(min_interval=2.0)</code></td><td>Per-user rate limiting.</td></tr>
+<tr><td><code>idempotency(window=5.0)</code></td><td>Drop duplicate updates within the window.</td></tr>
+<tr><td><code>whitelist(user_ids=None, group_ids=None)</code></td><td>Allow-list gates.</td></tr>
+</table>
+</section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section id="arch">
+<h2><a href="#arch">Architecture</a></h2>
+<p>
+  An update travels through SwiftBot as a staged chain of responsibility:
+  polling or webhook ingestion → raw dict parsing → worker pool →
+  <strong>dispatch routes</strong> → <strong>pipelines</strong> →
+  <strong>global middleware / Composer bundles</strong> → filter-matched handlers.
+  Handlers send replies through <code>TelegramAPI._request</code>, which passes the
+  call through the <strong>transformer stack</strong> before hitting the HTTP
+  connection pool.
+</p>
+<pre><code>Telegram            SwiftBot internals                    HTTP
+─────────           ───────────────────────               ────
+update ──▶ parse ──▶ WorkerPool (drain on stop)
+                  ──▶ bot.route()   ──┐
+                  ──▶ pipeline.deps() │  first-match-wins stages
+                  ──▶ use() / Composer┘  (boundaries isolate errors)
+                  ──▶ filters ──▶ handler(ctx)
+                  ──▶ ctx.reply(...) ──▶ transformer stack
+                                        (auto_typing, idempotency, Recorder)
+                  ──▶ pool.request() ──▶ POST api.telegram.org</code></pre>
+<p>
+  Testing lives beside the runtime: <code>TestClient</code> swaps in a
+  <code>FakePool</code> that records every outgoing call and can script responses,
+  while <code>Recorder</code> scripts the transformer layer for API-level tests —
+  together they make it possible to exercise 100% of handler logic without a single
+  network byte.
+</p>
+</section>
+
+<!-- ============ COMPARE ============ -->
+<section id="compare">
+<h2><a href="#compare">Feature Comparison</a></h2>
+<table>
+<tr><th>Feature</th><th>aiogram</th><th>PTB</th><th>pyTelegramBotAPI</th><th>teloxide</th><th>grammy</th><th><strong>SwiftBot 1.5</strong></th></tr>
+<tr><td>Async handler trees</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><strong>✓</strong></td></tr>
+<tr><td>Dependency injection (dptree-style)</td><td>—</td><td>—</td><td>—</td><td><strong>✓</strong></td><td>—</td><td><strong>✓</strong></td></tr>
+<tr><td>Declarative typed command spec + /help</td><td>partial</td><td>—</td><td>—</td><td><strong>✓</strong></td><td>—</td><td><strong>✓</strong></td></tr>
+<tr><td>Outbound transformer layer</td><td>—</td><td>—</td><td>—</td><td>—</td><td><strong>✓</strong></td><td><strong>✓</strong></td></tr>
+<tr><td>Composer + error boundaries</td><td>—</td><td>partial</td><td>—</td><td>—</td><td><strong>✓</strong></td><td><strong>✓</strong></td></tr>
+<tr><td>Pre-handler dispatch table (route)</td><td>—</td><td>—</td><td>—</td><td>—</td><td><strong>✓</strong></td><td><strong>✓</strong></td></tr>
+<tr><td>Typed wizard/dialog with data carry</td><td>partial</td><td>partial</td><td>—</td><td><strong>✓</strong></td><td>—</td><td><strong>✓</strong></td></tr>
+<tr><td>Graceful shutdown API</td><td>partial</td><td>✓</td><td>—</td><td><strong>✓</strong></td><td>—</td><td><strong>✓</strong></td></tr>
+<tr><td>First-party plugin registry</td><td>✓</td><td>✓</td><td>partial</td><td>—</td><td>✓</td><td><strong>✓</strong></td></tr>
+<tr><td>FSM storage (Memory/JSON/Redis)</td><td>✓</td><td>✓</td><td>—</td><td><strong>✓</strong></td><td>—</td><td><strong>✓</strong></td></tr>
+<tr><td>Network-free scripted testing</td><td>partial</td><td>—</td><td>—</td><td>—</td><td>✓</td><td><strong>✓</strong></td></tr>
+<tr><td>Bot API 2026 methods</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><strong>✓</strong></td></tr>
+</table>
+<p>
+  The table reflects the state at the time of writing: the dashes mark features
+  that exist nowhere in the Python ecosystem but are native to SwiftBot, ported
+  from the Rust/TypeScript/Go reference implementations.
+</p>
+</section>
+
+<!-- ============ MIGRATE ============ -->
+<section id="migrate">
+<h2><a href="#migrate">Upgrade Notes — v1.4 → v1.5</a></h2>
+<p>
+  Everything in v1.4 remains intact. v1.5 adds modules and new methods; nothing
+  is removed or renamed. Two notes for upgraders:
+</p>
+<ul>
+  <li style="margin-left:22px"><p style="margin:0"><code>bot.use()</code> now accepts a <code>Composer</code> directly — existing
+      middleware classes are unaffected. When a <code>Composer</code> has no error boundary,
+      exceptions propagate to your central exception handler as before.</p></li>
+  <li style="margin-left:22px"><p style="margin:0">If you mount a <code>Pipeline</code> alongside <code>@bot.on(...)</code>
+      handlers, pipeline branches take precedence for matching updates
+      (first-match-wins), so register broad fall-back branches last.</p></li>
+</ul>
+</section>
+
+<!-- ============ GITHUB ============ -->
+<section id="github">
+<h2><a href="#github">Source &amp; License</a></h2>
+<p>
+  SwiftBot is developed openly at
+  <a href="https://github.com/Arjun-M/SwiftBot">github.com/Arjun-M/SwiftBot</a>.
+  All work ships on feature branches with a pull request to <code>main</code> —
+  the v1.5 release lives on
+  <code>features/v1.5-standout</code> (PR #3). Licensed under the MIT License.
+</p>
+<p style="color:var(--muted); font-size:13.5px">
+  v1.5 · documentation generated August 2026 · © Arjun-M / SwiftBot contributors
+</p>
+
+</section>
+
+</main>
+</div>
+</body>
+</html>

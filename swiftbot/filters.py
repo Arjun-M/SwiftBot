@@ -431,6 +431,73 @@ class CustomFilter(Filter):
             return False
  
 
+class _FPreset:
+    """
+    Lazy preset factory powering the ``F.text & F.private & ~F.forwarded`` style
+    of filter composition (aiogram-style ergonomics on top of the existing
+    Filter algebra).
+
+    Accessing an attribute returns a fresh callable ``Filter`` instance so
+    presets can be reused safely in many handlers.
+    """
+
+    def __getattr__(self, name: str) -> Filter:
+        presets = {
+            "text": TextFilter(),
+            "private": PrivateFilter(),
+            "group": GroupFilter(),
+            "supergroup": SuperGroupFilter(),
+            "channel": ChannelFilter(),
+            "forwarded": ForwardedFilter(),
+            "reply": ReplyFilter(),
+            "photo": PhotoFilter(),
+            "video": VideoFilter(),
+            "audio": AudioFilter(),
+            "document": DocumentFilter(),
+            "voice": VoiceFilter(),
+            "sticker": StickerFilter(),
+            "animation": AnimationFilter(),
+            "video_note": VideoNoteFilter(),
+            "location": LocationFilter(),
+            "contact": ContactFilter(),
+            "media": MediaFilter(),
+        }
+        if name not in presets:
+            raise AttributeError(f"no such filter preset: {name!r}")
+        return presets[name]
+
+    def command(self, *commands: str) -> CommandFilter:
+        """Shortcut: ``F.command('start', 'help')`` → ``CommandFilter(...)``."""
+        if not commands:
+            raise ValueError("F.command() requires at least one command name")
+        return CommandFilter(list(commands))
+
+    def regex(self, pattern: str, flags: int = 0) -> RegexFilter:
+        return RegexFilter(pattern, flags=flags)
+
+    def user(self, *user_ids: int) -> "UserFilter":
+        return UserFilter(list(user_ids))
+
+    def chat(self, *chat_ids: int) -> "ChatFilter":
+        return ChatFilter(list(chat_ids))
+
+
+class SuperGroupFilter(Filter):
+    """Match updates originating in a supergroup chat."""
+
+    def __call__(self, message):
+        try:
+            chat = getattr(message, "chat", None)
+            if chat is None:
+                return False
+            ctype = getattr(chat, "type", None) or (
+                chat.get("type") if isinstance(chat, dict) else None)
+            return ctype == "supergroup"
+        except Exception as e:
+            logger.error(f"Error in SuperGroupFilter: {e}")
+            return False
+
+
 class Filters:
     """
     Collection of built-in filters for easy access.
@@ -583,3 +650,4 @@ class Filters:
         for f in filters[1:]:
             result = result | f
         return result
+F = _FPreset()

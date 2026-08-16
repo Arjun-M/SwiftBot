@@ -234,6 +234,39 @@ async def test_start_handler():
 
 `FakePool.script("methodName", result=...)` and `FakePool.script("methodName", error={"error_code": 400, "description": "..."})` let you drive any API response, and the pool records every outgoing call with method and params.
 
+## 🌟 v1.5.0 — The Standout Release
+
+v1.5 adds a full set of advanced framework capabilities: dependency-injected
+handler pipelines, declarative command specs, an outbound API transformer
+layer, middleware bundles with error boundaries, dispatch routing, typed
+wizards, graceful shutdown, a plugin registry, and composable filter algebra.
+The full documentation site lives in `docs/index.html`.
+
+| Feature | Module |
+| --- | --- |
+| Declarative handler pipelines with **dependency injection** | `swiftbot.pipeline` |
+| Declarative typed command specs with auto `/help` | `swiftbot.commands` |
+| **Outbound transformer layer** (auto typing, idempotency, Recorder) | `swiftbot.transformer` |
+| Middleware bundles with **error boundaries** | `swiftbot.composer` |
+| Pre-handler dispatch table | `bot.route()` |
+| Typed wizards with data carry | `swiftbot.wizard` |
+| Graceful shutdown (signal + drain) | `bot.run_shutdown()` |
+| First-party plugin registry | `swiftbot.plugins` |
+| `F` filter algebra | `swiftbot.filters` (`F = ...`) |
+
+```python
+# Dependency-injected pipeline handler — no globals needed
+from swiftbot.pipeline import Pipeline
+from swiftbot.filters import F
+
+async def stats(ctx, db, redis):
+    await ctx.reply(f"{await db.count_users()} users · ping={await redis.ping()}")
+
+pipe = Pipeline().deps(db=my_db, redis=my_redis)
+pipe.handle(F.command("stats"), stats)
+bot.pipeline(pipe)
+```
+
 ## 🆕 What's New in 1.4.0
 
 | Module | What it gives you |
@@ -257,7 +290,7 @@ MIT License - Copyright (c) 2025 Arjun-M/SwiftBot
 
 ## 🙏 Acknowledgments
 
-- Inspired by [Telethon](https://github.com/LonamiWebs/Telethon) Syntax
+- Designed with clean decorator ergonomics in mind
 - Built on [httpx](https://www.python-httpx.org/) for HTTP/2
 
 ---

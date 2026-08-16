@@ -5,10 +5,14 @@ Licensed under MIT License
 
 A Telegram bot framework with Telethon-inspired syntax, HTTP/2 connection
 pooling, persistent FSM storage, a test harness with a fake bot, typed
-callback data, deep linking utilities, and full Bot API 2026 support.
+callback data, deep linking utilities, full Bot API 2026 support — and the
+v1.5 standout set: declarative dependency-injected pipelines (teloxide
+dptree-style), typed command specs with auto ``/help``, grammy-style outbound
+transformers, composable middleware bundles with error boundaries, update-kind
+dispatch routing, typed wizards, graceful shutdown and first-party plugins.
 """
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 __author__ = "Arjun-M"
 __license__ = "MIT"
 
@@ -23,6 +27,13 @@ from .callback_data import CallbackData, CallbackDataInvalid
 from . import deep_linking
 from . import models
 from .testing import FakePool, TestClient
+from .pipeline import Pipeline
+from .commands import BotCommands, CommandsMiddleware
+from . import transformer
+from .composer import Composer
+from .wizard import Wizard
+from . import plugins
+from .filters import F
 
 
 __all__ = [
@@ -47,4 +58,12 @@ __all__ = [
     "models",
     "FakePool",
     "TestClient",
+    "Pipeline",
+    "BotCommands",
+    "CommandsMiddleware",
+    "transformer",
+    "Composer",
+    "Wizard",
+    "plugins",
+    "F",
 ]
