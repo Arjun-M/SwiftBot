@@ -1,7 +1,7 @@
 """
 Transformers — outbound API call interceptors.
 
-grammy (TypeScript/Deno) ships a feature no Python Telegram framework has: a
+Ships a feature no Python Telegram framework has: a
 **transformer** layer that intercepts *every outbound API call* before it hits
 the network (``bot.api.config.use(t)``). Middleware in the Python world only
 sees inbound updates; transformers close the loop by letting plugins observe
@@ -167,7 +167,7 @@ def auto_typing(chat_field: str = "chat_id", interval: float = 5.0,
     Send ``sendChatAction`` (typing) in the background while a handler runs
     that issued an API call taking a ``chat_id``. The typing timer fires
     once per ``interval`` seconds and stops when the request completes —
-    like grammy's ``autoChatAction``.
+    for free typing feedback on long operations.
 
     Args:
         chat_field: payload key carrying the chat id (usually ``chat_id``).

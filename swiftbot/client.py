@@ -156,14 +156,25 @@ class SwiftBot:
         self.middleware: List = []
 
         # --- v1.5 standout features ----------------------------------------
-        # Dispatch table mapping update kinds to middleware (grammy bot.route).
+        # Dispatch table mapping update kinds to middleware.
         self._routes: Dict[str, Any] = {}
-        # Mounted declarative pipelines (teloxide dptree-style).
+        # Mounted declarative pipelines.
         self._pipelines: List[Any] = []
-        # Named wizard registry (teloxide dialogue-style).
+        # Named wizard registry.
         self._wizards: Dict[str, Any] = {}
         # Graceful-shutdown bookkeeping.
         self._shutdown_requested = asyncio.Event()
+        # --------------------------------------------------------------------
+
+        # --- v1.6 additions ------------------------------------------------
+        # Named dialogue registry (state-carrying FSM).
+        self._dialogues: Dict[str, Any] = {}
+        # Scoped middleware chains (predicate-guarded middleware).
+        self._scopes: List[Any] = []
+        # Fallback for updates that matched nothing.
+        self._fallback: Optional[Callable] = None
+        # Fallback for unrecognized commands.
+        self._unknown_command: Optional[Callable] = None
         # --------------------------------------------------------------------
 
         # Running state
@@ -252,7 +263,7 @@ class SwiftBot:
     def route(self, routing_table: Dict[str, Any]) -> Dict[str, Any]:
         """
         Dispatch update kinds to middleware *before* handler routing
-        (grammy ``bot.route``). The middleware runs for every update of the
+        (update-kind dispatch). The middleware runs for every update of the
         given kind and then falls through to the normal router::
 
             bot.route({
@@ -284,7 +295,7 @@ class SwiftBot:
 
     def pipeline(self, pipe=None) -> Any:
         """
-        Mount a declarative ``Pipeline`` (teloxide dptree-style handler tree
+        Mount a declarative ``Pipeline`` (dependency-injected handler tree
         with dependency injection) onto this bot.
 
         Args:
@@ -310,6 +321,57 @@ class SwiftBot:
         self._wizards[name] = wiz
         return wiz
 
+    # ------------------------------------------------------------------
+    # v1.6 — dialogues, scopes, fallbacks
+    # ------------------------------------------------------------------
+
+    def dialogue(self, name: str, storage: Optional[Any] = None) -> Any:
+        """
+        Register a named ``Dialogue`` (state-carrying conversation FSM) and
+        return it. An update whose user has an active dialogue is routed to
+        the dialogue's current step before any other handler runs.
+        """
+        from .dialogue import Dialogue
+        dlg = Dialogue(name, storage or self.storage)
+        self._dialogues[name] = dlg
+        return dlg
+
+    def scope(self, predicate: Callable) -> Any:
+        """
+        Start a scoped middleware chain: the attached middleware runs only for
+        updates whose raw dict satisfies ``predicate``::
+
+            bot.scope(F.private).use(metrics_mw)
+        """
+        from .scopes import Scope
+        scope = Scope(predicate)
+        self._scopes.append(scope)
+        return scope
+
+    def fallback(self, handler: Callable) -> Callable:
+        """
+        Register a handler for updates that matched no route, pipeline branch
+        or registered handler::
+
+            @bot.fallback
+            async def not_found(ctx):
+                await ctx.reply("Sorry, I don't understand.")
+        """
+        self._fallback = handler
+        return handler
+
+    def on_unknown_command(self, handler: Callable) -> Callable:
+        """
+        Register a handler for messages that start with ``/`` but match no
+        registered command::
+
+            @bot.on_unknown_command
+            async def unknown(ctx):
+                await ctx.reply(f"Unknown command: {ctx.text}")
+        """
+        self._unknown_command = handler
+        return handler
+
     @staticmethod
     async def _noop():
         """Empty continuation used by dispatch routes that end the chain."""
@@ -317,7 +379,7 @@ class SwiftBot:
 
     async def run_shutdown(self, timeout: float = 30.0) -> None:
         """
-        Graceful shutdown (teloxide ``enable_ctrlc_handler``): install
+        Graceful shutdown: install
         SIGINT/SIGTERM handlers that stop the bot, drain the worker pool and
         close storage. Safe to call before ``bot.run()``; if a run loop is
         active it exits cleanly.
@@ -419,7 +481,7 @@ class SwiftBot:
             # Create context with proper parameters
             ctx = Context(self, update, update_obj, match)
 
-            # --- v1.5 dispatch routes: update-kind → middleware (grammy) ---
+            # --- v1.5 dispatch routes: update-kind → middleware ---
             if update_type in self._routes:
                 route_mw = self._routes[update_type]
                 try:
@@ -430,7 +492,32 @@ class SwiftBot:
                 except Exception as route_exc:
                     await self._handle_exception(route_exc, f"route_{update_type}")
 
-            # --- v1.5 pipelines: dptree-style DI handler trees -------------
+            # --- v1.6 dialogue dispatch: active dialogue takes priority ----
+            dialogue_handled = False
+            for dlg in self._dialogues.values():
+                try:
+                    current = await dlg.current(ctx)
+                except Exception as dlg_exc:
+                    await self._handle_exception(dlg_exc, f"dialogue_{dlg.name}")
+                    continue
+                if current is None:
+                    continue
+                if await dlg.step_forward(ctx, answer=ctx.text):
+                    dialogue_handled = True
+                break
+            if dialogue_handled:
+                self._stats['updates_processed'] += 1
+                self._stats['handlers_executed'] += 1
+                return
+
+            # --- v1.6 scoped middleware chains -----------------------------
+            for scope in self._scopes:
+                try:
+                    await scope.on_update(ctx, self._noop)
+                except Exception as scope_exc:
+                    await self._handle_exception(scope_exc, "scope")
+
+            # --- v1.5 pipelines: DI handler trees ----------------------
             pipeline_handled = False
             for pipe in self._pipelines:
                 try:
@@ -445,7 +532,21 @@ class SwiftBot:
                 return
 
             if not handler:
-                # This is normal, not an error
+                # v1.6: run the middleware chain even without a matched
+                # handler — middlewares like CommandsMiddleware use this pass
+                # to detect and handle unknown ``/command`` messages. The
+                # chain's ``next_handler`` here is a no-op.
+                if self.middleware:
+                    try:
+                        await self._execute_middleware_chain(ctx, self._noop)
+                    except Exception as mw_exc:
+                        await self._handle_exception(mw_exc, "middleware_unmatched")
+                # --- v1.6 fallback: give unmatched updates to a handler ----
+                if self._fallback is not None:
+                    try:
+                        await self._fallback(ctx)
+                    except Exception as fb_exc:
+                        await self._handle_exception(fb_exc, "fallback")
                 return
 
             # Execute middleware chain and handler

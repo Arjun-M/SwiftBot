@@ -2,21 +2,22 @@
 
 ## [1.5.0] — 2026-08-16
 
-The "standout" release. v1.5 was built by studying Telegram SDKs in other
-languages (teloxide/Rust, grammy/TypeScript, telebot/Go, kotlin-telegram-bot)
-and porting their best-loved features into idiomatic Python. Full documentation
-site: `docs/index.html`.
+The "standout" release. v1.5 closes the capability gaps that developers
+consistently hit in Python Telegram SDKs — dependency-injected handler
+pipelines, an outbound API-call layer, composable middleware bundles with error
+boundaries, declarative typed command specs, and typed wizards. Every feature is
+idiomatic Python and none exists in the rest of the Python ecosystem. Full
+documentation site: `docs/index.html`.
 
 ### Added
-- **`swiftbot.pipeline` — dependency-injected handler pipelines** (teloxide
-  dptree-style): handlers declare the dependencies they need by parameter name
+- **`swiftbot.pipeline` — dependency-injected handler pipelines**: handlers declare the dependencies they need by parameter name
   and the `Pipeline` injects them; undeclared dependencies raise
   `PipelineDependencyMissing` loudly. `bot.pipeline(pipe)` mounts a pipeline as
   a middleware stage.
 - **`swiftbot.commands` — declarative `BotCommands` specs**: typed arg
   placeholders (`<name:type>`), aliases, `Cmd.parse()`, auto-generated
   `help_text`, and `CommandsMiddleware` answering `/help` from the spec.
-- **`swiftbot.transformer` — outbound API call layer** (grammy-style):
+- **`swiftbot.transformer` — outbound API call layer**: a first for Python Telegram SDKs —
   `bot.api.config.use(...)` intercepts every API call. Built-ins: `auto_typing`,
   `idempotency_guard`, `call_logger`, `payload_patch`, and `Recorder` for
   scripting results/errors per method (network-free API-level testing).
@@ -24,12 +25,12 @@ site: `docs/index.html`.
   nestable bundles; raw middleware callables are invoked with `(ctx,
   next_handler)`; `.on_exception()` alias provided.
 - **`bot.route()` — pre-handler dispatch table** mapping update kinds (or raw
-  predicates) to middleware (grammy-style).
+  predicates) to middleware.
 - **`swiftbot.wizard` — typed conversation wizards**: `@step`, `@finish`,
   `on_enter`/`on_leave` hooks, storage-agnostic state, accumulated answers,
   `ctx.wizard` accessor; registered via `bot.wizard(name)`.
 - **`bot.run_shutdown()` — graceful shutdown**: SIGINT/SIGTERM handlers plus
-  worker-pool drain (teloxide `enable_ctrlc_handler`-style).
+  worker-pool drain.
 - **`swiftbot.plugins` — official plugin registry**: `SpamDeflector`,
   `SessionLimiter`, `Idempotency`, `Whitelist` classes with factory helpers
   (`spam_deflector`, `session_limiter`, `idempotency`, `whitelist`).
@@ -49,6 +50,39 @@ site: `docs/index.html`.
 
 ### Changed
 - Version bumped to **1.5.0**; new modules exported from `swiftbot`.
+
+## [1.6.0] — 2026-08-16
+
+The "state machine and safety net" release. v1.6 adds a state machine where
+states carry their own typed data (dialogues), predicate-guarded middleware
+scopes, outbound rate limiting, a fluent reply builder, and fallback handlers —
+a feature set no other Python Telegram framework offers in a single package.
+
+### Added
+- **`swiftbot.dialogue` — state-carrying dialogues**: `@dlg.state(name,
+  next=[...], timeout=...)` steps with a declared transition graph, typed carry
+  data passed between states, `Dialogue.next()` / `Dialogue.end`, `@dlg.finish`,
+  optional `@dlg.on_timeout` hooks, persistent state through the bot's storage,
+  and `DialogueTransitionError` for illegal moves. Active sessions intercept the
+  user's updates before any handler runs; `await dlg.exit(ctx)` releases them.
+- **`swiftbot.scopes` — scoped middleware chains**: `bot.scope(predicate)`
+  installs a middleware chain that runs only when a predicate over the raw
+  update matches — per chat type, per user, or per business rule. Scopes nest
+  Composer bundles and their error boundaries.
+- **`swiftbot.throttle` — outbound rate-limit transformer**: token-bucket
+  throttling as a `bot.api.config.use()` stage, with an optional per-chat rate
+  that keeps noisy chats from consuming the global budget.
+- **`swiftbot.reply` — fluent `Reply` builder**: chain `.text()`,
+  `.caption()`, `.markup()`, `.silent()`, `.protect()`, `.reply_to()`,
+  `.parse_mode()` and `.option()`, then `await .send()`.
+- **`bot.fallback(handler)` and `bot.on_unknown_command(handler)`**: safety-net
+  handlers for unmatched updates and `/command` messages not covered by a
+  `BotCommands` spec (the latter works through `CommandsMiddleware`, which now
+  forwards unknown commands and lets the middleware chain run even on
+  no-match updates).
+
+### Changed
+- Version bumped to **1.6.0**; new modules exported from `swiftbot`.
 
 ## [1.4.0] — 2026-08-15
 

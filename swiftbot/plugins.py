@@ -1,7 +1,7 @@
 """
 Official plugins — first-class, installable middleware plugins.
 
-grammy's ecosystem success comes from plugins being *middleware functions*
+The success of modern bot ecosystems comes from plugins being *middleware functions*
 that anyone can publish and install with a single ``bot.use(...)``. This
 module ships the four plugins most bots need, implemented as plain
 ``on_update(ctx, next_handler)`` middleware so they compose with everything
