@@ -1,0 +1,8 @@
+# Frameworks benchmarked on Python 3.12.3
+swiftbot==1.6.3
+aiogram==3.30.0
+python-telegram-bot==22.8
+pyTelegramBotAPI==4.36.1
+
+# Analysis and chart generation
+matplotlib>=3.7

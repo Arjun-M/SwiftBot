@@ -14,7 +14,7 @@ fluent reply builder, fallback handlers, graceful shutdown and first-party
 plugins.
 """
 
-__version__ = "1.6.0"
+__version__ = "1.6.3"
 __author__ = "Arjun-M"
 __license__ = "MIT"
 

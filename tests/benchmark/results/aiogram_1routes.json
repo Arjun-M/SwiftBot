@@ -1,0 +1,23 @@
+{
+  "framework": "aiogram",
+  "routes": 1,
+  "iterations_per_repeat": 2000,
+  "warmup_iterations": 100,
+  "repeats": 5,
+  "python": "3.12.3",
+  "setup_ms": 4201.409116,
+  "repeat_seconds": [
+    0.588866262,
+    0.654374474,
+    0.704952268,
+    0.607991831,
+    0.595073721
+  ],
+  "median_seconds": 0.607991831,
+  "p95_seconds": 0.7403567238,
+  "median_throughput_updates_per_second": 3289.5178816966704,
+  "median_latency_microseconds_per_update": 303.9959155,
+  "handler_hits": 10100,
+  "expected_handler_hits": 10100,
+  "correct": true
+}

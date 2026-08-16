@@ -6,6 +6,7 @@ webhook server (must pass raw dicts, not wrapped objects).
 import asyncio
 import json
 import os
+import sys
 import tempfile
 
 import pytest
@@ -272,6 +273,20 @@ async def test_webhook_rejects_bad_json_and_bad_secret():
 
 
 # ---------- Client ----------
+
+@pytest.mark.asyncio
+async def test_webhook_reports_missing_aiohttp(monkeypatch):
+    client = SwiftBot("test-token")
+    monkeypatch.delitem(sys.modules, "swiftbot.webhook", raising=False)
+    monkeypatch.delitem(sys.modules, "swiftbot.webhook.server", raising=False)
+    monkeypatch.setitem(sys.modules, "aiohttp", None)
+
+    with pytest.raises(
+        ConfigurationError,
+        match="Webhook mode requires the 'aiohttp' dependency",
+    ):
+        await client.run_webhook(webhook_url="https://example.com/webhook")
+
 
 def test_client_token_validation():
     with pytest.raises(ConfigurationError):

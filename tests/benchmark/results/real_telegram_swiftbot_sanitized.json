@@ -1,0 +1,141 @@
+{
+  "benchmark": "real_telegram_read_only",
+  "framework": "swiftbot",
+  "swiftbot_version": "1.6.3",
+  "python": "3.12.3",
+  "host_rss_before_build_kib": 28248,
+  "host_rss_after_build_kib": 33956,
+  "build_rss_delta_kib": 5708,
+  "connection_pool_initialize_ms": 0.200992,
+  "configuration": {
+    "worker_pool_size": 8,
+    "max_connections": 16,
+    "http2_enabled": true
+  },
+  "identity": {
+    "status": "ok",
+    "is_bot": true
+  },
+  "chat_check": {
+    "status": "ok",
+    "type": "private",
+    "expected_chat_id_matches": true,
+    "expected_username_matches": true
+  },
+  "getme_latency": {
+    "label": "SwiftBot API getMe",
+    "successful_calls": 20,
+    "failed_calls": 0,
+    "median_ms": 641.399514,
+    "p95_ms": 676.58627185,
+    "min_ms": 638.84874,
+    "max_ms": 678.092255,
+    "samples_ms": [
+      639.726788,
+      639.293189,
+      642.884565,
+      638.84874,
+      641.425443,
+      642.69442,
+      640.951248,
+      647.972592,
+      639.478505,
+      639.406141,
+      639.916384,
+      642.101449,
+      645.179445,
+      641.373585,
+      678.092255,
+      639.527436,
+      646.527158,
+      645.305489,
+      641.888883,
+      639.5542
+    ],
+    "errors": []
+  },
+  "getchat_latency": {
+    "label": "SwiftBot API getChat",
+    "successful_calls": 5,
+    "failed_calls": 0,
+    "median_ms": 641.12962,
+    "p95_ms": 659.9373664000001,
+    "min_ms": 638.867401,
+    "max_ms": 652.685057,
+    "samples_ms": [
+      641.12962,
+      638.887442,
+      638.867401,
+      642.324615,
+      652.685057
+    ],
+    "errors": []
+  },
+  "getupdates_samples": [
+    {
+      "ok": true,
+      "elapsed_ms": 639.319598,
+      "count": 1
+    },
+    {
+      "ok": true,
+      "elapsed_ms": 642.099589,
+      "count": 1
+    },
+    {
+      "ok": true,
+      "elapsed_ms": 639.84242,
+      "count": 1
+    },
+    {
+      "ok": true,
+      "elapsed_ms": 414.612335,
+      "count": 1
+    },
+    {
+      "ok": true,
+      "elapsed_ms": 639.255525,
+      "count": 1
+    }
+  ],
+  "concurrent_getme": [
+    {
+      "concurrency": 1,
+      "wall_time_ms": 640.004038,
+      "completed": 1,
+      "failed": 0,
+      "failures": []
+    },
+    {
+      "concurrency": 2,
+      "wall_time_ms": 640.707828,
+      "completed": 2,
+      "failed": 0,
+      "failures": []
+    },
+    {
+      "concurrency": 4,
+      "wall_time_ms": 645.676269,
+      "completed": 4,
+      "failed": 0,
+      "failures": []
+    },
+    {
+      "concurrency": 8,
+      "wall_time_ms": 1017.933452,
+      "completed": 8,
+      "failed": 0,
+      "failures": []
+    }
+  ],
+  "safety": {
+    "write_methods_called": [],
+    "read_methods_called": [
+      "getMe",
+      "getChat",
+      "getUpdates"
+    ],
+    "token_printed": false,
+    "identifiers_removed": true
+  }
+}

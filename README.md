@@ -1,291 +1,107 @@
+<img src="https://raw.githubusercontent.com/Arjun-M/SwiftBot/main/banner.jpg" alt="SwiftBot - Ultra-Fast Telegram Bot Framework" width="100%">
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![PyPI](https://img.shields.io/pypi/v/swiftbot.svg)](https://pypi.org/project/swiftbot/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-passing-green.svg)](https://github.com/Arjun-M/SwiftBot/actions)
 
-SwiftBot is an async Telegram bot framework built for simplicity and correctness. It offers typed decorators, composable filters, a middleware chain, persistent state (FSM) storage, HTTP/2 connection pooling with Telegram `Retry-After` compliance, and a full typed error hierarchy — plus a built-in testing harness, typed Bot API models, deep-linking utilities, Redis storage, proxy support, and up-to-date Bot API 2026 coverage.
+# SwiftBot
 
-## 🚀 Key Features
-
-### Developer Experience
-- **Telethon-Style Decorators**: Clean, intuitive `@client.on(Message(...))` syntax
-- **Command Router with Trie**: O(m) command lookup for registered slash commands
-- **Regex Pattern Matching**: Powerful message filtering
-- **Composable Filters**: Exact-text, regex, and custom function filters
-- **Type Hints**: Full IDE support
-- **Rich Context Object**: Easy access to all update data, plus `ctx.reply()`, `ctx.answer()` shortcuts
-
-### Robustness
-- **Persistent FSM Storage**: State survives restarts — in-memory, JSON-file, or Redis backends (pluggable via `BaseStorage`, with per-key TTL via `StateManager`)
-- **Testing Harness**: `FakePool` + `TestClient` let you run handlers against the real router, worker pool, filters and middleware with zero network calls — every outgoing API request is recorded and responses are scriptable
-- **Typed Models**: `User`, `Chat`, `Message`, `CallbackQuery`, `InlineKeyboardMarkup`, `Document` with tolerant `from_dict`/`to_dict`
-- **CallbackData**: Type-safe typed callback payloads with `pack`/`unpack` and a 64-byte guard
-- **Deep Linking**: `create_start_link`, `encode_payload`, `decode_payload`, `parse_start_param`
-- **Bot API 2026**: New methods (managed bots, guest mode, rich messages, live photos, ephemeral messages) and new update kinds (business messages, purchases)
-- **Rate-Limit Compliance**: Honors Telegram `Retry-After` on 429 responses, with circuit breaker
-- **Typed Error Hierarchy**: Catch `ChatNotFound`, `TooManyRequests`, `Forbidden`, `InvalidToken`, etc.
-- **Worker Pool with Backpressure**: Bounded concurrency and a dead-letter queue for failed updates
-- **Webhook Server**: Secret-token verification, size limits, and health/metrics endpoints
-- **File Support**: `InputFile` for local uploads, plus `get_file`/`download_file` helpers
-- **HTTP/2 Connection Pooling**: Built on httpx with keep-alive connections
-- **Proxy Support**: `SwiftBot(proxy="http/https/socks5://...")` routes all API traffic through a proxy
-- **Centralized Exception Handling** and built-in metrics
-
-## 📦 Installation
+SwiftBot is a fast, async-first Telegram bot framework built for simplicity and correctness. One decorator registers a handler, a rich `Context` object does the talking, and the framework quietly handles everything else — HTTP/2 connection pooling, `Retry-After` compliance, persistent state storage, and a fully typed error hierarchy. Everything is typed, everything is optional, and you never need an external database to get started.
 
 ```bash
 pip install swiftbot
-
-# Or from GitHub
-pip install git+https://github.com/Arjun-M/SwiftBot.git
 ```
 
-## 🎯 Quick Start
+The built-in webhook server is optional. Polling does not require `aiohttp`; install the webhook extra only when you need webhook mode:
+
+```bash
+pip install "swiftbot[webhook]"
+```
+
+## Why SwiftBot
+
+SwiftBot is a strong fit for asynchronous, route-heavy bots where local dispatch speed, predictable resource use, typed APIs, and operational controls matter. The checked-in benchmark snapshot measured SwiftBot at **28,954 updates per second** and **34.5 microseconds per update** for a controlled ten-route offline workload on Python 3.12.3. Every framework routed all expected handler calls correctly; these measurements exclude Telegram network latency, databases, business logic, and application-specific middleware.
+
+| Advantage | What it means in practice | Evidence in this repository |
+|---|---|---|
+| **Fast local dispatch** | More handler work can be processed per process before application logic or network I/O becomes the bottleneck. | SwiftBot measured 3.25× the throughput of python-telegram-bot, 4.30× pyTelegramBotAPI, and 20.6× aiogram in the controlled offline comparison. |
+| **Low measured framework footprint** | Smaller framework distributions and lower measured peak RSS can help constrained deployments, while dependency footprints still need to be evaluated for the full application. | The snapshot measured 32.9 MiB peak RSS and a 0.93 MiB SwiftBot package distribution. |
+| **Useful async concurrency** | I/O-like handlers can scale with bounded worker concurrency rather than relying on unbounded task creation. | The worker-pool benchmark reached 2,839 completed updates per second at eight workers versus 437 at one worker, with all 400 updates completed in every repeat. |
+| **Operational safeguards** | HTTP/2 pooling, retry-after handling, bounded backpressure, dead-letter handling, and typed Telegram errors reduce the amount of reliability plumbing bot authors must build themselves. | These are implemented in the connection pool, worker pool, exception hierarchy, and webhook server. |
+| **Network-free testing** | Handlers can be exercised without Telegram credentials or network calls, with outgoing API requests captured for assertions. | The built-in `TestClient` harness and the repository’s 210 passing tests provide the local testing path. |
+
+The benchmark results are **controlled local measurements, not a universal claim that SwiftBot is faster for every production bot**. Framework choice should still account for ecosystem maturity, compatibility requirements, workload shape, network latency, and a project-specific load test. See the full [benchmark report](tests/benchmark/BENCHMARK_REPORT.md) and the [reproduction guide](tests/benchmark/README.md) for methods, charts, raw results, and caveats.
+
+## Quick Start
 
 ```python
 import asyncio
-from swiftbot import SwiftBot
+from swiftbot import SwiftBot, Filters as F
 from swiftbot.types import Message
-from swiftbot.middleware import Logger, RateLimiter
 
-# Initialize bot
-client = SwiftBot(
-    token="YOUR_BOT_TOKEN",
-    worker_pool_size=50,
-    enable_http2=True
-)
+bot = SwiftBot(token="YOUR_BOT_TOKEN")
 
-# Add cache-based middleware
-client.use(Logger(level="INFO"))
-client.use(RateLimiter(rate=10, per=60))
+@bot.on(Message(text="hello"))
+async def hello(ctx):
+    await ctx.reply("Hi there!")
 
-# Simple command handler
-@client.on(Message(pattern=r"^/start"))
+@bot.on(Message(filters=F.command("start")))
 async def start(ctx):
-    await ctx.reply("Hello! I'm SwiftBot 🚀")
+    await ctx.reply("Welcome! Send me hello.")
 
-# Run bot
-asyncio.run(client.run())
+asyncio.run(bot.run())
 ```
 
-## 📖 Documentation
+That is the whole bot. No router setup, no dispatch table, no middleware boilerplate.
 
-### Client Initialization
+## Core Concepts
+
+### Handlers and Filters
+
+Handlers are registered with `@bot.on(Message(...))` and the first matching handler wins. Filters are composable — combine commands, regex patterns, and predicates:
 
 ```python
-from swiftbot import SwiftBot
+@bot.on(Message(filters=F.command("ban") & F.chat(-100123456789)))
+async def ban(ctx):
+    ...
 
-client = SwiftBot(
-    token="YOUR_BOT_TOKEN",
-    parse_mode="HTML",
-    worker_pool_size=50,
-    max_connections=100,
-    timeout=30,
-    enable_http2=True,
-    enable_centralized_exceptions=True
+@bot.on(Message(pattern=r"^/weather (\w+)"))
+async def weather(ctx):
+    city = ctx.match.group(1)
+    await ctx.reply(f"Weather in {city}: sunny")
+```
+
+### Context
+
+Every handler receives a `Context` with typed access to the update, plus shortcuts that cover most use cases: `ctx.reply()`, `ctx.edit()`, `ctx.delete()`, `ctx.answer_callback()`, and `ctx.forward_to()`.
+
+### Buttons and Callbacks
+
+```python
+from swiftbot import InlineKeyboard, Button, CallbackData
+
+# Declare the payload shape once
+page = CallbackData("page", int)
+
+# Attach packed payloads to buttons
+kb = InlineKeyboard([]).add_row(
+    Button.inline("1", page.pack(1)),
+    Button.inline("2", page.pack(2)),
 )
+await ctx.reply("Pick a page:", reply_markup=kb.to_dict())
+
+# Filter on valid payloads and decode the typed data
+@bot.on(CallbackQuery(pattern=rf"^{page.prefix}:[^:]+:[^:]+$"))
+async def on_page(ctx):
+    page_num = page.unpack(ctx.callback_query.data)[0]
+    await ctx.answer_callback(f"Page {page_num}")
 ```
 
-### Event Handlers
+### State and Dialogues
+
+State survives restarts with pluggable storage backends — in-memory, JSON file, or Redis — and the dialogue system models multi-step conversations as declared transition graphs with per-state timeouts:
 
 ```python
-from swiftbot.types import Message, CallbackQuery
-
-# Message handlers
-@client.on(Message())  # All messages
-@client.on(Message(text="hello"))  # Exact text match
-@client.on(Message(pattern=r"^/start"))  # Regex pattern
-
-# Callback query handlers
-@client.on(CallbackQuery(data="button_1"))
-@client.on(CallbackQuery(pattern=r"page_(\d+)"))
-```
-
-### Context Object
-
-```python
-@client.on(Message())
-async def handler(ctx):
-    # Message data
-    ctx.text          # Message text
-    ctx.user          # Sender user object
-    ctx.chat          # Chat object
-    ctx.args          # Command arguments
-    ctx.match         # Regex match object
-
-    # Reply methods
-    await ctx.reply("Text")
-    await ctx.edit("New text")
-    await ctx.delete()
-    await ctx.forward_to(chat_id)
-```
-
-### In-built Middleware
-
-```python
-from swiftbot.middleware import Logger, RateLimiter, Auth, AnalyticsCollector
-
-# Logging (no external dependencies)
-client.use(Logger(level="INFO", format="colored"))
-
-# Rate limiting (in-memory cache)
-client.use(RateLimiter(rate=10, per=60))
-
-# Authentication (cache-based user management)
-client.use(Auth(admin_list=[123, 456]))
-
-# Analytics (cache-based metrics)
-client.use(AnalyticsCollector(enable_real_time=True))
-```
-
-## 🏗️ Architecture
-
-### Cache-Based Design
-- **No External Dependencies** for core functionality
-- **In-Memory Caching** for middleware data
-- **Automatic Cleanup** of old cache entries
-- **High Performance** without database overhead
-
-### Connection Pool
-- HTTP/2 multiplexing for 100+ concurrent streams
-- Persistent keep-alive connections
-- Automatic connection recycling
-- Circuit breaker for fault tolerance
-
-### Worker Pool
-- Configurable worker count
-- Bounded queue with backpressure
-- Dead-letter queue for failed updates (exceptions preserved, retryable via `retry_dead_letters()`)
-- Graceful drain on shutdown
-
-
-## 🔧 Development
-
-### Project Structure
-
-```
-swiftbot/
-├── __init__.py           # Package initialization
-├── client.py             # Main SwiftBot class
-├── context.py            # Context object
-├── types.py              # Event types
-├── filters.py            # Filter system
-├── storage.py            # FSM storage backends (memory + JSON file)
-├── router.py             # Command router
-├── webhook/              # aiohttp webhook server
-├── exceptions/           # Exception handling
-│   ├── base.py
-│   ├── handlers.py
-│   ├── api.py
-│   └── telegram.py     # Typed Telegram error hierarchy
-├── middleware/           # Logger, RateLimiter, Auth, AnalyticsCollector
-│   ├── base.py
-│   ├── logger.py
-│   ├── rate_limiter.py
-│   ├── auth.py
-│   └── analytics.py
-└── examples/             # Example bots
-    └── basic_bot.py
-
-Tests live in `tests/` and run via CI on every push.
-```
-
-## 🎯 Use Cases
-
-- ✅ **Lightweight bots** without external dependencies
-- ✅ **High-performance applications** needing speed
-- ✅ **Serverless deployments** with minimal footprint
-- ✅ **Development environments** with quick setup
-- ✅ **Educational projects** learning bot development
-
-## 🧪 Testing Your Bot
-
-The built-in harness runs your handlers end to end without a single network call:
-
-```python
-import pytest
-from swiftbot import SwiftBot
-from swiftbot.testing import TestClient
-from swiftbot.types import Message
-from swiftbot.filters import Command
-
-bot = SwiftBot(token="0000000000:TEST")
-
-@bot.on(Message(text=Command("start")))
-async def start(ctx):
-    await ctx.reply("Hello!")
-
-async def test_start_handler():
-    async with TestClient(bot) as client:
-        await client.send_update({
-            "update_id": 1,
-            "message": {
-                "message_id": 1, "date": 1000,
-                "chat": {"id": 42, "type": "private"},
-                "from": {"id": 7, "is_bot": False, "first_name": "Tester"},
-                "text": "/start",
-            },
-        })
-
-    assert client.outgoing[0]["method"] == "sendMessage"
-    assert client.outgoing[0]["params"]["text"] == "Hello!"
-    assert client.outgoing[0]["params"]["chat_id"] == 42
-```
-
-`FakePool.script("methodName", result=...)` and `FakePool.script("methodName", error={"error_code": 400, "description": "..."})` let you drive any API response, and the pool records every outgoing call with method and params.
-
-## 🌟 v1.5.0 — The Standout Release
-
-v1.5 adds a full set of advanced framework capabilities: dependency-injected
-handler pipelines, declarative command specs, an outbound API transformer
-layer, middleware bundles with error boundaries, dispatch routing, typed
-wizards, graceful shutdown, a plugin registry, and composable filter algebra.
-The full documentation site lives in `docs/index.html`.
-
-| Feature | Module |
-| --- | --- |
-| Declarative handler pipelines with **dependency injection** | `swiftbot.pipeline` |
-| Declarative typed command specs with auto `/help` | `swiftbot.commands` |
-| **Outbound transformer layer** (auto typing, idempotency, Recorder) | `swiftbot.transformer` |
-| Middleware bundles with **error boundaries** | `swiftbot.composer` |
-| Pre-handler dispatch table | `bot.route()` |
-| Typed wizards with data carry | `swiftbot.wizard` |
-| Graceful shutdown (signal + drain) | `bot.run_shutdown()` |
-| First-party plugin registry | `swiftbot.plugins` |
-| `F` filter algebra | `swiftbot.filters` (`F = ...`) |
-
-```python
-# Dependency-injected pipeline handler — no globals needed
-from swiftbot.pipeline import Pipeline
-from swiftbot.filters import F
-
-async def stats(ctx, db, redis):
-    await ctx.reply(f"{await db.count_users()} users · ping={await redis.ping()}")
-
-pipe = Pipeline().deps(db=my_db, redis=my_redis)
-pipe.handle(F.command("stats"), stats)
-bot.pipeline(pipe)
-```
-
-## 🌟 v1.6.0 — Dialogues, Scopes & Safety Nets
-
-v1.6 adds the state-machine and safety-net layer: **state-carrying dialogues**
-(declared transition graphs, typed carry data between states, per-state
-timeouts with an expiry hook), **scoped middleware chains** guarded by
-predicates over the raw update, **outbound rate-limit throttling** as a
-transformer, a **fluent `Reply` builder**, and **fallback / unknown-command
-handlers**. Documentation site: `docs/index.html`.
-
-| Feature | Module |
-| --- | --- |
-| State-carrying dialogue FSM with transition graph + timeout | `swiftbot.dialogue` |
-| Predicate-guarded scoped middleware | `swiftbot.scopes` + `bot.scope()` |
-| Outbound token-bucket rate limiting | `swiftbot.throttle` |
-| Fluent reply builder | `swiftbot.reply` (`Reply(ctx)`) |
-| Fallback + unknown-command handlers | `bot.fallback()`, `bot.on_unknown_command()` |
-
-```python
-# A dialogue: states carry their own data, transitions are declared
 survey = bot.dialogue("survey")
 
 @survey.state("ask_name", next=["ask_age"])
@@ -297,44 +113,79 @@ async def ask_name(ctx, prev=None):
 async def ask_age(ctx, prev=None):
     await ctx.reply(f"Hi {prev}, how old are you?")
     return Dialogue.end
-
-# Scoped middleware — runs only where the predicate matches
-bot.scope(lambda u: u.get("message", {}).get("chat", {}).get("type") == "private") \
-   .use(plugins.session_limiter(min_interval=1.0))
-
-# Outbound rate limiting
-bot.api.config.use(throttle(max_per_second=20.0, per_chat=4.0))
-
-# Safety nets
-@bot.fallback
-async def catch_all(ctx):
-    await ctx.reply("I didn't catch that — try /help.")
 ```
 
-## 🆕 What's New in 1.4.0
+### Middleware, Pipelines and Scopes
 
-| Module | What it gives you |
+Middleware runs around every handler, and the `Composer` bundles middleware chains with error boundaries. `Pipeline` adds dependency injection so handlers stay pure and testable, while `scope()` attaches middleware to only the updates matching a predicate.
+
+```python
+from swiftbot.middleware import Logger, RateLimiter
+from swiftbot.pipeline import Pipeline
+
+bot.use(Logger())
+bot.use(RateLimiter(rate=20, per=60))
+
+pipe = Pipeline().deps(db=my_db)
+async def stats(ctx, db):
+    await ctx.reply(f"{await db.count()} users")
+pipe.handle(F.command("stats"), stats)
+bot.pipeline(pipe)
+
+bot.scope(F.private).use(RateLimiter(rate=1, per=1.0))
+```
+
+### Safety Nets
+
+Fallback handlers catch anything that no other handler matched, and outbound throttling keeps your bot under Telegram's limits automatically:
+
+```python
+@bot.fallback
+async def catch_all(ctx):
+    await ctx.reply("Try /help.")
+
+bot.api.config.use(throttle(max_per_second=20.0, per_chat=4.0))
+```
+
+## Testing Without Telegram
+
+The built-in harness runs your real handlers with zero network calls — every outgoing API request is captured and every response is scriptable:
+
+```python
+from swiftbot.testing import TestClient
+
+async with TestClient(bot) as client:
+    await client.send_update({
+        "update_id": 1,
+        "message": {
+            "message_id": 1, "date": 1,
+            "chat": {"id": 1, "type": "private"},
+            "from": {"id": 2, "is_bot": False, "first_name": "A"},
+            "text": "hello",
+        },
+    })
+
+assert client.outgoing[0]["method"] == "sendMessage"
+```
+
+## More
+
+| Topic | What you get |
 | --- | --- |
-| `swiftbot.testing` | `FakePool` + `TestClient` — network-free handler tests |
-| `swiftbot.callback_data` | Typed callback payloads (`pack`/`unpack`/`filter`) |
-| `swiftbot.deep_linking` | Deep-link creation and payload encode/decode |
-| `swiftbot.models` | Typed `User`/`Chat`/`Message`/`CallbackQuery`/`Document` models |
-| `swiftbot.storage` | `RedisStorage` alongside `MemoryStorage`/`JSONFileStorage` |
-| `swiftbot.connection.pool` | Proxy support (`SwiftBot(proxy=...)`) |
-| `swiftbot.api.telegram` | 11 Bot API 2026 methods (managed bots, guest mode, rich messages, live photos, ephemeral messages) |
-| `swiftbot.update_types` | 9 new update kinds (business messages, guest messages, purchases) |
+| [Commands](https://github.com/Arjun-M/SwiftBot/tree/main/docs/05_Commands.md) | Declarative command specs with auto-generated `/help` |
+| [Transformers](https://github.com/Arjun-M/SwiftBot/tree/main/docs/16_Transformers.md) | Outbound API layer with auto-typing and recording |
+| [Deep Linking](https://github.com/Arjun-M/SwiftBot/tree/main/docs/09_DeepLinking.md) | Typed `?start=` payloads for referrals and auth |
+| [Webhooks](https://github.com/Arjun-M/SwiftBot/tree/main/docs/22_Webhooks.md) | aiohttp server with secret-token verification and metrics |
+| [Storage](https://github.com/Arjun-M/SwiftBot/tree/main/docs/17_StorageAndState.md) | In-memory, JSON-file, and Redis FSM backends |
+| [Exceptions](https://github.com/Arjun-M/SwiftBot/tree/main/docs/18_Exceptions.md) | Typed `ChatNotFound`, `TooManyRequests`, `Forbidden`, ... |
+| [Benchmarks](tests/benchmark/README.md) | Reproducible dispatch, memory, worker-pool, backpressure, and read-only Telegram smoke tests with reports and graphs |
 
-## 🤝 Contributing
+The complete documentation lives in the [`docs/`](https://github.com/Arjun-M/SwiftBot/tree/main/docs) folder. The benchmark suite is documented in [`tests/benchmark/README.md`](tests/benchmark/README.md), with the measured results summarized in [`tests/benchmark/BENCHMARK_REPORT.md`](tests/benchmark/BENCHMARK_REPORT.md).
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## Contributing
 
-## 📄 License
+Contributions are welcome — open an issue or submit a pull request.
 
-MIT License - Copyright (c) 2025 Arjun-M/SwiftBot
+## License
 
-## 🙏 Acknowledgments
-
-- Designed with clean decorator ergonomics in mind
-- Built on [httpx](https://www.python-httpx.org/) for HTTP/2
-
----
+MIT — Copyright (c) 2026 Arjun-M/SwiftBot
