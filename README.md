@@ -20,17 +20,17 @@ pip install "swiftbot[webhook]"
 
 ## Why SwiftBot
 
-SwiftBot is a strong fit for asynchronous, route-heavy bots where local dispatch speed, predictable resource use, typed APIs, and operational controls matter. The checked-in benchmark snapshot measured SwiftBot at **28,954 updates per second** and **34.5 microseconds per update** for a controlled ten-route offline workload on Python 3.12.3. Every framework routed all expected handler calls correctly; these measurements exclude Telegram network latency, databases, business logic, and application-specific middleware.
+SwiftBot is a strong fit for asynchronous, route-heavy bots where local dispatch speed, predictable resource use, typed APIs, and operational controls matter. The checked-in benchmark snapshot measured SwiftBot at **19,803 updates per second** and **50.5 microseconds per update** through its public raw-update test path for a controlled ten-route offline workload on Python 3.12.3. Every framework routed all expected handler calls correctly; these measurements exclude Telegram network latency, databases, business logic, and application-specific middleware.
 
 | Advantage | What it means in practice | Evidence in this repository |
 |---|---|---|
-| **Fast local dispatch** | More handler work can be processed per process before application logic or network I/O becomes the bottleneck. | SwiftBot measured 3.25× the throughput of python-telegram-bot, 4.30× pyTelegramBotAPI, and 20.6× aiogram in the controlled offline comparison. |
-| **Low measured framework footprint** | Smaller framework distributions and lower measured peak RSS can help constrained deployments, while dependency footprints still need to be evaluated for the full application. | The snapshot measured 32.9 MiB peak RSS and a 0.93 MiB SwiftBot package distribution. |
-| **Useful async concurrency** | I/O-like handlers can scale with bounded worker concurrency rather than relying on unbounded task creation. | The worker-pool benchmark reached 2,839 completed updates per second at eight workers versus 437 at one worker, with all 400 updates completed in every repeat. |
+| **Fast local dispatch** | More handler work can be processed per process before application logic or network I/O becomes the bottleneck. | In the corrected public raw-update comparison, SwiftBot measured 1.91× pyTelegramBotAPI, 2.10× python-telegram-bot, and 16.24× aiogram for this workload. These are versioned public-path observations, not universal production claims. |
+| **Low measured framework footprint** | Smaller framework distributions and lower measured peak RSS can help constrained deployments, while dependency footprints still need to be evaluated for the full application. | The corrected public-path snapshot measured 33.2 MiB peak RSS for SwiftBot; package and dependency footprints should be evaluated separately. |
+| **Useful async concurrency** | I/O-like handlers can scale with bounded worker concurrency rather than relying on unbounded task creation. | The worker-pool benchmark reached 2,804 completed updates per second at eight workers versus 438 at one worker, with all 400 updates completed in every repeat. |
 | **Operational safeguards** | HTTP/2 pooling, retry-after handling, bounded backpressure, dead-letter handling, and typed Telegram errors reduce the amount of reliability plumbing bot authors must build themselves. | These are implemented in the connection pool, worker pool, exception hierarchy, and webhook server. |
-| **Network-free testing** | Handlers can be exercised without Telegram credentials or network calls, with outgoing API requests captured for assertions. | The built-in `TestClient` harness and the repository’s 210 passing tests provide the local testing path. |
+| **Network-free testing** | Handlers can be exercised without Telegram credentials or network calls, with outgoing API requests captured for assertions. | The built-in `TestClient` harness and the repository’s 212 passing tests provide the local testing path; 10 live-environment tests remain skipped without credentials. |
 
-The benchmark results are **controlled local measurements, not a universal claim that SwiftBot is faster for every production bot**. Framework choice should still account for ecosystem maturity, compatibility requirements, workload shape, network latency, and a project-specific load test. See the full [benchmark report](tests/benchmark/BENCHMARK_REPORT.md) and the [reproduction guide](tests/benchmark/README.md) for methods, charts, raw results, and caveats.
+The benchmark results are **controlled local measurements, not a universal claim that SwiftBot is faster for every production bot**. Framework choice should still account for ecosystem maturity, compatibility requirements, workload shape, network latency, and a project-specific load test. See the complete [benchmark report and reproduction guide](tests/benchmark/README.md) for methods, charts, raw results, and caveats.
 
 ## Quick Start
 
@@ -180,7 +180,7 @@ assert client.outgoing[0]["method"] == "sendMessage"
 | [Exceptions](https://github.com/Arjun-M/SwiftBot/tree/main/docs/18_Exceptions.md) | Typed `ChatNotFound`, `TooManyRequests`, `Forbidden`, ... |
 | [Benchmarks](tests/benchmark/README.md) | Reproducible dispatch, memory, worker-pool, backpressure, and read-only Telegram smoke tests with reports and graphs |
 
-The complete documentation lives in the [`docs/`](https://github.com/Arjun-M/SwiftBot/tree/main/docs) folder. The benchmark suite is documented in [`tests/benchmark/README.md`](tests/benchmark/README.md), with the measured results summarized in [`tests/benchmark/BENCHMARK_REPORT.md`](tests/benchmark/BENCHMARK_REPORT.md).
+The complete documentation lives in the [`docs/`](https://github.com/Arjun-M/SwiftBot/tree/main/docs) folder. The complete benchmark report and reproduction guide are in [`tests/benchmark/README.md`](tests/benchmark/README.md).
 
 ## Contributing
 

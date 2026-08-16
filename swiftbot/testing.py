@@ -194,8 +194,14 @@ class TestClient:
         await self.bot.worker_pool.stop()
 
     async def send_update(self, raw_update: Dict[str, Any]):
-        """Feed a raw Telegram update dict through the real processing path."""
+        """Feed one raw Telegram update and wait for handler completion."""
         await self.bot.worker_pool.submit(self.bot._process_update, raw_update)
+        await self.drain()
+
+    async def send_updates(self, raw_updates: List[Dict[str, Any]]):
+        """Feed a batch of raw updates and wait for all handlers to finish."""
+        for raw_update in raw_updates:
+            await self.bot.worker_pool.submit(self.bot._process_update, raw_update)
         await self.drain()
 
     async def send_message(self, **params) -> Dict[str, Any]:
@@ -204,6 +210,11 @@ class TestClient:
         return result
 
     async def drain(self, pause: float = 0.02):
-        """Yield the event loop until the worker queue empties."""
-        while not self.bot.worker_pool.queue.empty():
-            await asyncio.sleep(pause)
+        """Wait until all submitted work has called ``queue.task_done()``.
+
+        ``pause`` is retained for source compatibility but is no longer used.
+        ``asyncio.Queue.join`` waits for both queued and in-flight work, unlike
+        polling ``queue.empty()``, which can return too early after a worker
+        takes an item but before its handler completes.
+        """
+        await self.bot.worker_pool.queue.join()

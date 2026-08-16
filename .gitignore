@@ -35,4 +35,15 @@ Thumbs.db
 *.pem
 *.key
 *.json.lock
+*.secret
+*.secrets
+.env*
+Env.txt
+*token*
+*credential*
 bot_state.json
+
+# Real benchmark output must be sanitized before publication
+tests/benchmark/results/raw/
+tests/benchmark/venv*/
+tests/benchmark/results/public/*local*.json

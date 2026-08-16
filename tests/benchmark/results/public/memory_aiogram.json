@@ -1,0 +1,22 @@
+{
+  "benchmark": "public_raw_update_memory",
+  "framework": "aiogram",
+  "routes": 10,
+  "updates": 10000,
+  "batch_size": 100,
+  "python": "3.12.3",
+  "gc_mode": "enabled",
+  "api_surface": "public Dispatcher.feed_raw_update",
+  "process_start_rss_kib": 21828,
+  "after_build_rss_kib": 156060,
+  "after_workload_rss_kib": 158088,
+  "peak_sampled_rss_kib": 158088,
+  "build_rss_delta_kib": 134232,
+  "workload_rss_delta_kib": 2028,
+  "peak_rss_delta_from_build_start_kib": 136260,
+  "ru_maxrss_kib": 158088,
+  "build_elapsed_ms": 3959.993677,
+  "handler_hits": 10000,
+  "expected_handler_hits": 10000,
+  "correct": true
+}

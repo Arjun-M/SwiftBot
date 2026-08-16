@@ -1,102 +1,103 @@
-# SwiftBot Benchmark Suite
+# SwiftBot Benchmark Report
 
-This repository contains a reproducible benchmark and technical assessment of **SwiftBot** against aiogram, python-telegram-bot, and pyTelegramBotAPI. It covers offline dispatch speed, latency, route-scaling behavior, worker-pool concurrency, queue backpressure, resident memory, package footprint, startup/build cost, and a separate read-only real Telegram API smoke test.
+**Assessment date:** 2026-08-16
+**Runtime:** Python 3.12.3, Linux x86_64, 6 vCPUs, 3.8 GiB RAM
 
-## Project stance
+## Executive stance
 
-The controlled offline results support SwiftBot as a promising high-performance framework for greenfield asynchronous Telegram bots. SwiftBot led the local dispatch and RSS tests in this environment, and its worker pool demonstrated useful scaling with an asynchronous handler and bounded queue behavior. The project should still be adopted with a load-test and compatibility gate for mission-critical deployments because its public ecosystem and release maturity are less established than the leading alternatives.
+> **SwiftBot has a measured low-overhead public update-processing path and a useful worker-pool design, but this benchmark is not evidence of universal end-to-end superiority.**
 
-## Primary measured results
+The earlier internal-path result has been replaced. The corrected benchmark uses public raw-update processing surfaces, exact-text matching, one logical worker, enabled garbage collection, identical synthetic Telegram-shaped updates, and correctness assertions.
 
-| Framework | Median offline throughput | Median latency | Peak RSS | Framework package |
-|---|---:|---:|---:|---:|
-| SwiftBot 1.6.3 | **28,954 updates/s** | **34.5 µs/update** | **32.9 MiB** | **0.93 MiB** |
-| python-telegram-bot 22.8 | 8,919 updates/s | 112.1 µs/update | 39.6 MiB | 6.75 MiB |
-| pyTelegramBotAPI 4.36.1 | 6,734 updates/s | 148.5 µs/update | 46.0 MiB | 4.44 MiB |
-| aiogram 3.30.0 | 1,407 updates/s | 710.9 µs/update | 154.0 MiB | 5.76 MiB |
+SwiftBot leads the corrected local workload, but the conclusion is deliberately narrower: it is a promising option for performance-sensitive greenfield asynchronous bots. The safer production recommendation remains to pilot it against the application’s own middleware, persistence, webhook, error, and network workload before migration.
 
-All four frameworks routed the expected handler invocations correctly. These are local dispatch measurements without Telegram network latency, outbound API calls, databases, Redis, webhooks, or application-specific business logic.
+## Framework versions
 
-## Repository layout
+| Framework | Version | Public path measured |
+|---|---:|---|
+| SwiftBot | 1.6.3 | `TestClient.send_updates` |
+| aiogram | 3.30.0 | `Dispatcher.feed_raw_update` |
+| python-telegram-bot | 22.8 | `Application.process_update` |
+| pyTelegramBotAPI | 4.36.1 | `AsyncTeleBot.process_new_updates` |
 
-```text
-.
-├── README.md
-├── BENCHMARK_REPORT.md
-├── SECURITY.md
-├── .gitignore
-├── requirements-benchmark.txt
-├── scripts/
-│   ├── benchmark_dispatch.py
-│   ├── benchmark_memory.py
-│   ├── benchmark_pool.py
-│   ├── benchmark_swiftbot_harness.py
-│   ├── collect_stats.py
-│   ├── analyze_results.py
-│   ├── analyze_extended.py
-│   ├── real_telegram_benchmark.py
-│   ├── sanitize_real_result.py
-│   ├── inspect_competitors.py
-│   ├── inspect_runtime_config.py
-│   ├── inspect_swiftbot.py
-│   └── smoke_dispatch.py
-├── results/
-│   ├── full_*_10routes.json
-│   ├── *_1routes.json / *_10routes.json / *_50routes.json
-│   ├── memory_*_normalgc.json
-│   ├── pool_full.json
-│   ├── stats_*.json
-│   └── real_telegram_swiftbot_sanitized.json
-├── analysis/
-│   ├── extended_summary.csv
-│   ├── primary_summary.csv
-│   ├── throughput_10routes.png
-│   ├── routing_scalability.png
-│   ├── memory_peak_rss.png
-│   └── swiftbot_pool_scaling.png
-└── docs/
-    ├── extended_scope.md
-    └── installation_notes.md
-```
+Package identities and documented capabilities were checked against the official package pages and project documentation.[1] [2] [3] [4] [5]
 
-## Benchmark tests and graph outputs
+## Corrected public raw-update benchmark
 
-The suite is organized as reproducible offline tests plus an explicitly read-only real Telegram smoke test. The checked-in JSON and CSV files are the measured snapshot used by [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md); rerunning the scripts can produce different numbers on another machine or under a different runtime load.
+The benchmark uses ten exact-text routes, 100 warm-up updates, 2,000 measured updates per repeat, five repeats, one logical worker, enabled Python garbage collection, and no Telegram network calls. Every framework receives the same synthetic update shape and the same no-I/O async handler. Every run reached the expected 10,100 handler invocations.
 
-| Test file | What it tests | Main output |
-|---|---|---|
-| `scripts/benchmark_dispatch.py` | Routes synthetic updates through SwiftBot, aiogram, python-telegram-bot, or pyTelegramBotAPI and measures throughput, latency, correctness, and route scaling. | `results/full_*_10routes.json`, `results/*_1routes.json`, `results/*_10routes.json`, `results/*_50routes.json` |
-| `scripts/benchmark_memory.py` | Measures fresh-process peak RSS, workload RSS delta, package size, and site-packages footprint for each framework. | `results/memory_*_normalgc.json` |
-| `scripts/benchmark_pool.py` | Measures SwiftBot worker-pool throughput across worker counts and verifies bounded-queue backpressure and completion counts. | `results/pool_full.json` |
-| `scripts/benchmark_swiftbot_harness.py` | Measures the built-in `TestClient` harness with no Telegram network calls. | A JSON result supplied with `--output` |
-| `scripts/collect_stats.py` | Collects package and environment size statistics from an isolated virtual environment. | `results/stats_*.json` |
-| `scripts/analyze_results.py` | Aggregates primary results and writes the primary summary tables and charts. | `analysis/primary_summary.*`, `analysis/throughput_10routes.png`, `analysis/routing_scalability.png`, `analysis/memory_peak_rss.png` |
-| `scripts/analyze_extended.py` | Aggregates extended results and writes the worker-pool summary and scaling chart. | `analysis/extended_summary.*`, `analysis/pool_summary.json`, `analysis/swiftbot_pool_scaling.png` |
-| `scripts/real_telegram_benchmark.py` | Performs read-only `getMe`, `getChat`, and `getUpdates` checks against Telegram when explicitly supplied with private credentials. | A local JSON result supplied with `--output` |
-| `scripts/sanitize_real_result.py` | Removes bot and chat identifiers from a real benchmark result before publication. | A sanitized JSON result |
+| Framework | Median throughput | Median latency/update | Peak RSS | Correct |
+|---|---:|---:|---:|---|
+| **SwiftBot 1.6.3** | **19,803 updates/s** | **50.5 µs** | **33.2 MiB** | Yes |
+| pyTelegramBotAPI 4.36.1 | 10,358 updates/s | 96.5 µs | 46.8 MiB | Yes |
+| python-telegram-bot 22.8 | 9,432 updates/s | 106.0 µs | 39.9 MiB | Yes |
+| aiogram 3.30.0 | 1,219 updates/s | 820.4 µs | 154.4 MiB | Yes |
 
-### Generated graphs
+SwiftBot measured approximately 1.91× the pyTelegramBotAPI throughput, 2.10× python-telegram-bot, and 16.24× aiogram in this specific public raw-update workload. These ratios are **not universal framework speed claims**. The adapters are public and more comparable than the previous version, but their internals still differ: some frameworks construct typed update objects, perform validation, or run different middleware and scheduling paths.
 
-The benchmark analysis scripts generate the following charts from the JSON result files. They are included here so the benchmark results can be reviewed directly from the repository:
+![Corrected public-path throughput](reports/charts/fair_throughput_10routes.png)
 
-![Throughput comparison](analysis/throughput_10routes.png)
+## Fairness rules and limitations
 
-![Routing scalability](analysis/routing_scalability.png)
+The benchmark normalizes the input update structure, route count, exact-text matching intent, handler body, worker count, garbage-collection mode, warm-up, repeats, and correctness assertion. SwiftBot uses the public `TestClient.send_updates()` path, aiogram uses `Dispatcher.feed_raw_update`, python-telegram-bot uses `Application.process_update` after `Update.de_json`, and pyTelegramBotAPI uses `AsyncTeleBot.process_new_updates` after its update conversion.
 
-![Peak resident memory](analysis/memory_peak_rss.png)
+These calls are public and representative, but they are not implementation-identical. A framework that constructs richer typed models is doing more work inside the measured path. The results therefore answer a practical question—how these installed versions process a Telegram-shaped raw update through their public offline APIs—not an abstract question about which architecture is intrinsically fastest.
 
-![SwiftBot worker-pool scaling](analysis/swiftbot_pool_scaling.png)
+The test excludes Telegram network latency, webhook servers, database and Redis calls, application business logic, large media payloads, production middleware stacks, logging, retries, and long-duration stability. The real Telegram test is reported separately and is not combined with local dispatch throughput.
 
-Run the analysis after collecting or replacing results:
+## Route scaling
 
-```bash
-python3 scripts/analyze_results.py
-python3 scripts/analyze_extended.py
-```
+The corrected sweep uses the same public paths with one, ten, and fifty exact-text routes. Results are stored in `results/public/` and summarized in `reports/scaling.json`.
 
-## Reproduce the offline benchmark
+![Corrected route scaling](reports/charts/fair_scalability.png)
 
-Use Python 3.12 or another supported Python 3.10+ runtime. The benchmark uses isolated virtual environments so dependency graphs do not contaminate one another.
+## Memory and resource footprint
+
+The resource benchmark uses a fresh process per framework, normal garbage collection, ten routes, 10,000 updates, and 100-update batches through the same public raw-update surfaces.
+
+| Framework | Peak RSS | Build RSS delta | Workload RSS delta | Correct |
+|---|---:|---:|---:|---|
+| **SwiftBot** | **33.2 MiB** | **11.1 MiB** | **0.63 MiB** | Yes |
+| python-telegram-bot | 39.9 MiB | 18.3 MiB | 0.25 MiB | Yes |
+| pyTelegramBotAPI | 46.8 MiB | 24.7 MiB | 0.77 MiB | Yes |
+| aiogram | 154.4 MiB | 131.1 MiB | 1.98 MiB | Yes |
+
+SwiftBot had the lowest peak RSS in this run. These are process-level observations for this workload, not guarantees for arbitrary bots. RSS includes the interpreter and dependency graph.
+
+![Corrected peak RSS](reports/charts/fair_memory_peak_rss.png)
+
+## Worker pool and backpressure
+
+The SwiftBot worker-pool test uses a 2 ms asynchronous handler delay, 400 updates, queue size 100, and three repeats per worker count. All updates completed correctly in every repeat.
+
+| Workers | Median throughput | Completion |
+|---:|---:|---:|
+| 1 | 438 updates/s | 400/400 |
+| 2 | 840 updates/s | 400/400 |
+| 4 | 1,580 updates/s | 400/400 |
+| 8 | **2,804 updates/s** | 400/400 |
+
+The bounded-queue test offered 20 updates to one worker with queue size two, 50 ms handler delay, and a five-millisecond submit timeout. Four updates were accepted and completed; sixteen timed out; no accepted work was silently lost.
+
+The default pool configuration is 50 workers, queue size 1,000, dead-letter handling enabled, and a five-second backpressure timeout. Async workers improve I/O concurrency but do not create CPU parallelism for CPU-bound handlers.
+
+## TestClient correction
+
+The public `TestClient.drain()` implementation previously polled `queue.empty()` with a default 20 ms sleep. That could return too early when a worker had taken a task but had not finished its handler, and it made the public harness look artificially slow. It now uses `asyncio.Queue.join()`, which waits for every submitted task to call `queue.task_done()`. Regression tests cover both a slow in-flight handler and a multi-update batch.
+
+## Real Telegram API smoke test
+
+The separate real-environment test is intentionally read-only. It calls only `getMe`, `getChat`, and `getUpdates`; it does not send messages, modify webhooks, acknowledge updates, or call administrative methods. The verified run recorded approximately 641 ms median latency for both `getMe` and `getChat`, successful concurrent read calls, and no write methods. Real network latency dominates local dispatch differences, so this result is not used to rank framework speed.
+
+The real runner supports `--sanitize`, which removes bot and chat identifiers before writing a publishable result. Keep tokens outside the repository and write raw output only to the ignored `results/raw/` directory.
+
+## Recommendation
+
+SwiftBot should be presented as a **promising low-overhead async Telegram framework with a configurable worker pool**, not as a universally 3–20× faster replacement. The corrected public-path result supports further development and targeted pilots. Before calling it production-ready for mission-critical workloads, the project should add long-running soak tests, webhook benchmarks, persistence and Redis tests, middleware-heavy cases, retry/error tests, and compatibility guarantees.
+
+## Reproduction
+
+Install the pinned frameworks in isolated environments:
 
 ```bash
 python3 -m venv venv-swiftbot
@@ -108,47 +109,48 @@ venv-swiftbot/bin/python -m pip install swiftbot==1.6.3
 venv-aiogram/bin/python -m pip install aiogram==3.30.0
 venv-ptb/bin/python -m pip install python-telegram-bot==22.8
 venv-telebot/bin/python -m pip install pyTelegramBotAPI==4.36.1
-
-python3 -m py_compile scripts/*.py
-
-venv-swiftbot/bin/python scripts/benchmark_dispatch.py swiftbot --routes 10 --iterations 5000 --warmup 250 --repeats 7 --output results/full_swiftbot_10routes.json
-venv-aiogram/bin/python scripts/benchmark_dispatch.py aiogram --routes 10 --iterations 5000 --warmup 250 --repeats 7 --output results/full_aiogram_10routes.json
-venv-ptb/bin/python scripts/benchmark_dispatch.py ptb --routes 10 --iterations 5000 --warmup 250 --repeats 7 --output results/full_ptb_10routes.json
-venv-telebot/bin/python scripts/benchmark_dispatch.py telebot --routes 10 --iterations 5000 --warmup 250 --repeats 7 --output results/full_telebot_10routes.json
 ```
 
-The memory and worker-pool tests can be run as follows:
+Run the primary benchmark from the repository root:
 
 ```bash
-venv-swiftbot/bin/python scripts/benchmark_memory.py swiftbot --routes 10 --updates 10000 --output results/memory_swiftbot_normalgc.json
-venv-aiogram/bin/python scripts/benchmark_memory.py aiogram --routes 10 --updates 10000 --output results/memory_aiogram_normalgc.json
-venv-ptb/bin/python scripts/benchmark_memory.py ptb --routes 10 --updates 10000 --output results/memory_ptb_normalgc.json
-venv-telebot/bin/python scripts/benchmark_memory.py telebot --routes 10 --updates 10000 --output results/memory_telebot_normalgc.json
+mkdir -p tests/benchmark/results/raw
 
-venv-swiftbot/bin/python scripts/benchmark_pool.py --updates 400 --delay 0.002 --queue-size 100 --repeats 3 --backpressure-updates 20 --backpressure-delay 0.05 --backpressure-timeout 0.005 --output results/pool_full.json
-python3 scripts/analyze_results.py
-python3 scripts/analyze_extended.py
+PYTHONPATH=. venv-swiftbot/bin/python tests/benchmark/benchmark_dispatch.py swiftbot --routes 10 --iterations 2000 --warmup 100 --repeats 5 --output tests/benchmark/results/raw/swiftbot.json
+venv-aiogram/bin/python tests/benchmark/benchmark_dispatch.py aiogram --routes 10 --iterations 2000 --warmup 100 --repeats 5 --output tests/benchmark/results/raw/aiogram.json
+venv-ptb/bin/python tests/benchmark/benchmark_dispatch.py ptb --routes 10 --iterations 2000 --warmup 100 --repeats 5 --output tests/benchmark/results/raw/ptb.json
+venv-telebot/bin/python tests/benchmark/benchmark_dispatch.py telebot --routes 10 --iterations 2000 --warmup 100 --repeats 5 --output tests/benchmark/results/raw/telebot.json
 ```
 
-## Real Telegram smoke test
+Run memory, worker-pool, and report generation:
 
-The real test is deliberately read-only. It calls only `getMe`, `getChat`, and `getUpdates`, and records latency, concurrency behavior, and process RSS. It does not send messages, modify bot state, set webhooks, or acknowledge updates. Do not commit a token or raw private result file.
+```bash
+PYTHONPATH=. venv-swiftbot/bin/python tests/benchmark/benchmark_memory.py swiftbot --routes 10 --updates 10000 --batch-size 100 --output tests/benchmark/results/raw/memory_swiftbot.json
+PYTHONPATH=. venv-swiftbot/bin/python tests/benchmark/benchmark_pool.py --updates 400 --delay 0.002 --queue-size 100 --repeats 3 --backpressure-updates 20 --backpressure-delay 0.05 --backpressure-timeout 0.005 --output tests/benchmark/results/raw/pool.json
+python3 tests/benchmark/analyze.py
+```
+
+Run the read-only real API test:
 
 ```bash
 export TELEGRAM_TOKEN_FILE=/secure/location/Env.txt
-venv-swiftbot/bin/python scripts/real_telegram_benchmark.py \
+PYTHONPATH=. venv-swiftbot/bin/python tests/benchmark/benchmark_real_api.py \
   --token-file "$TELEGRAM_TOKEN_FILE" \
   --chat-id "$TELEGRAM_CHAT_ID" \
   --expected-username "$TELEGRAM_EXPECTED_USERNAME" \
-  --output results/real_telegram_swiftbot_local.json
+  --output tests/benchmark/results/raw/real_telegram.json
 ```
 
-The checked-in `real_telegram_swiftbot_sanitized.json` removes bot IDs, chat IDs, usernames, and other identifying fields while preserving the measured latency and resource metrics. A new real run should be sanitized before publication.
+Never commit a token or unsanitized real response. Revoke any token that has been exposed.
 
-## Security
+## References
 
-Never put a Telegram token in source code, Markdown, shell history, Git history, issue comments, or benchmark output. Use a file outside the repository or an environment variable, and revoke any token that has been exposed. See [`SECURITY.md`](SECURITY.md).
+[1]: https://pypi.org/project/swiftbot/ "SwiftBot on PyPI"
 
-## Sources
+[2]: https://github.com/Arjun-M/SwiftBot "SwiftBot on GitHub"
 
-The package identities and documented capabilities were checked against the official [SwiftBot PyPI page](https://pypi.org/project/swiftbot/), [SwiftBot GitHub repository](https://github.com/Arjun-M/SwiftBot), [aiogram PyPI page](https://pypi.org/project/aiogram/), [python-telegram-bot PyPI page](https://pypi.org/project/python-telegram-bot/), and [pyTelegramBotAPI PyPI page](https://pypi.org/project/pyTelegramBotAPI/).
+[3]: https://pypi.org/project/aiogram/ "aiogram on PyPI"
+
+[4]: https://pypi.org/project/python-telegram-bot/ "python-telegram-bot on PyPI"
+
+[5]: https://pypi.org/project/pyTelegramBotAPI/ "pyTelegramBotAPI on PyPI"

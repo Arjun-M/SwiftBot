@@ -1,0 +1,22 @@
+{
+  "benchmark": "public_raw_update_memory",
+  "framework": "ptb",
+  "routes": 10,
+  "updates": 10000,
+  "batch_size": 100,
+  "python": "3.12.3",
+  "gc_mode": "enabled",
+  "api_surface": "public Application.process_update",
+  "process_start_rss_kib": 21836,
+  "after_build_rss_kib": 40620,
+  "after_workload_rss_kib": 40880,
+  "peak_sampled_rss_kib": 40880,
+  "build_rss_delta_kib": 18784,
+  "workload_rss_delta_kib": 260,
+  "peak_rss_delta_from_build_start_kib": 19044,
+  "ru_maxrss_kib": 40880,
+  "build_elapsed_ms": 209.591683,
+  "handler_hits": 10000,
+  "expected_handler_hits": 10000,
+  "correct": true
+}

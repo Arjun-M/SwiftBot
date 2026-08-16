@@ -1,0 +1,121 @@
+{
+  "benchmark": "swiftbot_worker_pool",
+  "python": "3.12.3",
+  "concurrency_scaling": [
+    {
+      "workers": 1,
+      "updates": 400,
+      "handler_delay_seconds": 0.002,
+      "queue_size": 100,
+      "repeats": 3,
+      "repeat_seconds": [
+        0.903250742,
+        0.920676399,
+        0.912931633
+      ],
+      "median_seconds": 0.912931633,
+      "median_throughput_updates_per_second": 438.14891010573626,
+      "completed_per_repeat": [
+        400,
+        400,
+        400
+      ],
+      "submit_errors_per_repeat": [
+        0,
+        0,
+        0
+      ],
+      "correct": true
+    },
+    {
+      "workers": 2,
+      "updates": 400,
+      "handler_delay_seconds": 0.002,
+      "queue_size": 100,
+      "repeats": 3,
+      "repeat_seconds": [
+        0.474868562,
+        0.493536555,
+        0.476388507
+      ],
+      "median_seconds": 0.476388507,
+      "median_throughput_updates_per_second": 839.6508188641083,
+      "completed_per_repeat": [
+        400,
+        400,
+        400
+      ],
+      "submit_errors_per_repeat": [
+        0,
+        0,
+        0
+      ],
+      "correct": true
+    },
+    {
+      "workers": 4,
+      "updates": 400,
+      "handler_delay_seconds": 0.002,
+      "queue_size": 100,
+      "repeats": 3,
+      "repeat_seconds": [
+        0.252541019,
+        0.253124417,
+        0.255064022
+      ],
+      "median_seconds": 0.253124417,
+      "median_throughput_updates_per_second": 1580.2505532289285,
+      "completed_per_repeat": [
+        400,
+        400,
+        400
+      ],
+      "submit_errors_per_repeat": [
+        0,
+        0,
+        0
+      ],
+      "correct": true
+    },
+    {
+      "workers": 8,
+      "updates": 400,
+      "handler_delay_seconds": 0.002,
+      "queue_size": 100,
+      "repeats": 3,
+      "repeat_seconds": [
+        0.141686839,
+        0.142664829,
+        0.143165021
+      ],
+      "median_seconds": 0.142664829,
+      "median_throughput_updates_per_second": 2803.774432730018,
+      "completed_per_repeat": [
+        400,
+        400,
+        400
+      ],
+      "submit_errors_per_repeat": [
+        0,
+        0,
+        0
+      ],
+      "correct": true
+    }
+  ],
+  "backpressure": {
+    "workers": 1,
+    "updates_offered": 20,
+    "handler_delay_seconds": 0.05,
+    "queue_size": 2,
+    "backpressure_timeout_seconds": 0.005,
+    "submit_elapsed_seconds": 0.006229406,
+    "accepted": 4,
+    "timed_out": 16,
+    "other_outcomes": [],
+    "completed": 4,
+    "dead_letters_after_stop": 0,
+    "bounded_behavior_observed": true,
+    "no_silent_loss": true
+  }
+}
