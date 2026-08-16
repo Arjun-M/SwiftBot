@@ -39,7 +39,9 @@ class HTTPConnectionPool:
         enable_http2: bool = True,
         max_retries: int = 3,
         backoff_factor: float = 0.5,
+        proxy: Optional[str] = None,
     ):
+        self.proxy = proxy
         self.max_connections = max_connections
         self.max_keepalive = max_keepalive_connections
         self.enable_http2 = enable_http2
@@ -63,10 +65,17 @@ class HTTPConnectionPool:
         # The pool transport handles transient network errors; HTTP-layer
         # retry logic (429/5xx) now lives in ``request()`` where we can
         # honor Telegram's ``Retry-After`` header.
-        self.transport = httpx.AsyncHTTPTransport(
-            http2=enable_http2,
-            limits=self.limits
-        )
+        #
+        # ``proxy`` takes precedence over ``transport`` — httpx cannot use a
+        # custom transport together with proxies, so the retry logic still
+        # applies through ``request()`` on top of the proxy.
+        if proxy:
+            self.transport = None
+        else:
+            self.transport = httpx.AsyncHTTPTransport(
+                http2=enable_http2,
+                limits=self.limits
+            )
 
         self._client: Optional[httpx.AsyncClient] = None
         self._lock = asyncio.Lock()
@@ -82,10 +91,11 @@ class HTTPConnectionPool:
         """Initialize the HTTP client"""
         if self._client is None:
             self._client = httpx.AsyncClient(
-                http2=self.enable_http2,
+                http2=self.enable_http2 and self.proxy is None,
                 limits=self.limits,
                 timeout=self.timeout,
                 transport=self.transport,
+                proxy=self.proxy,
                 follow_redirects=True
             )
 

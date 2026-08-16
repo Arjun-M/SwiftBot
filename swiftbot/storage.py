@@ -172,6 +172,84 @@ class JSONFileStorage(BaseStorage):
             self._dirty = False
 
 
+class RedisStorage(BaseStorage):
+    """
+    Redis storage for multi-process and multi-container deployments.
+
+    Requires ``redis`` (or ``redis[hiredis]``) to be installed:
+        pip install "redis[hiredis]"
+
+    Each ``(namespace, key)`` pair maps to a Redis hash field under the
+    Redis key ``swiftbot:<namespace>``. ``BaseStorage`` makes no TTL
+    promises per key, but ``ttl`` on the constructor (or per-call via
+    ``set(..., ttl=...)``) sets a default key expiry — convenient for
+    session cleanup in large bots.
+
+    Example::
+        client = SwiftBot(
+            token="...",
+            storage=RedisStorage("redis://localhost:6379/0", ttl=3600),
+        )
+    """
+
+    PREFIX = "swiftbot"
+
+    def __init__(
+        self,
+        url: str = "redis://localhost:6379/0",
+        ttl: Optional[float] = None,
+        **connection_kwargs: Any,
+    ):
+        if not url:
+            raise StorageError("Redis URL cannot be empty")
+        self.url = url
+        self.ttl = ttl
+        self._connection_kwargs = connection_kwargs
+        self._client: Optional[Any] = None
+
+    def _ensure_client(self) -> Any:
+        if self._client is None:
+            try:
+                import redis.asyncio as aioredis  # noqa
+            except ImportError:  # pragma: no cover - dependency absent
+                raise StorageError(
+                    "redis is not installed — run `pip install redis[hiredis]`"
+                )
+            self._client = aioredis.from_url(
+                self.url, decode_responses=True, **self._connection_kwargs
+            )
+        return self._client
+
+    def _redis_key(self, namespace: str) -> str:
+        return f"{self.PREFIX}:{namespace}"
+
+    async def set(self, namespace: str, key: str, value: Any, ttl: Optional[float] = None) -> None:
+        client = self._ensure_client()
+        await client.hset(self._redis_key(namespace), key, json.dumps(value))
+        expiry = self.ttl if ttl is None else ttl
+        if expiry:
+            await client.expire(self._redis_key(namespace), int(expiry))
+
+    async def get(self, namespace: str, key: str) -> Optional[Any]:
+        client = self._ensure_client()
+        raw = await client.hget(self._redis_key(namespace), key)
+        if raw is None:
+            return None
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return raw
+
+    async def delete(self, namespace: str, key: str) -> None:
+        client = self._ensure_client()
+        await client.hdel(self._redis_key(namespace), key)
+
+    async def close(self) -> None:
+        if self._client is not None:
+            await self._client.close()
+            self._client = None
+
+
 class StateManager:
     """
     High-level FSM state manager backed by a storage backend.

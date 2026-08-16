@@ -63,6 +63,7 @@ class SwiftBot:
         timeout: float = 30.0,
         enable_http2: bool = True,
         api_base_url: str = "https://api.telegram.org",
+        proxy: Optional[str] = None,
         connection_pool: Optional[Dict] = None,
         retry_config: Optional[Dict] = None,
         rate_limiter: Optional[Dict] = None,
@@ -82,7 +83,12 @@ class SwiftBot:
             max_connections: Maximum HTTP connections
             timeout: Request timeout in seconds
             enable_http2: Enable HTTP/2 support
-            api_base_url: Telegram API base URL
+            api_base_url: Telegram API base URL (also accepts a local Bot API
+                server such as ``http://localhost:8081``)
+            proxy: HTTP or SOCKS5 proxy URL, e.g.
+                ``http://user:pass@host:port`` or
+                ``socks5://user:pass@host:port`` — needed when Telegram is
+                blocked on the deployment network
             connection_pool: Advanced connection pool config
             retry_config: Retry configuration
             rate_limiter: Rate limiter configuration
@@ -119,6 +125,7 @@ class SwiftBot:
                 keepalive_expiry=pool_config.get('keepalive_expiry', 30.0),
                 timeout=timeout,
                 enable_http2=enable_http2,
+                proxy=proxy,
                 max_retries=retry_config.get('max_retries', 3) if retry_config else 3,
                 backoff_factor=retry_config.get('backoff_factor', 0.5) if retry_config else 0.5,
             )

@@ -50,6 +50,7 @@ class EventType:
         incoming: bool = True,
         outgoing: bool = False,
         filter_func: Optional[Callable] = None,
+        filters: Optional[Callable] = None,
         **kwargs
     ):
         """
@@ -67,7 +68,9 @@ class EventType:
         self.text = text
         self.patterns = self._compile_patterns(pattern)
         self.func = func  # Legacy support
-        self.filter_func = filter_func  # New unified filter
+        # ``filters`` is an alias for ``filter_func`` so call sites can use the
+        # more conventional name used by aiogram / PTB filter systems.
+        self.filter_func = filter_func if filter_func is not None else filters
         self.incoming = incoming
         self.outgoing = outgoing
         self.filters = kwargs

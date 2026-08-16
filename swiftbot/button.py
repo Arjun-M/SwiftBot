@@ -117,6 +117,40 @@ class InlineKeyboard:
             ]
         }
 
+    def text_row(self, *pairs: Union[InlineButton, str, tuple]) -> 'InlineKeyboard':
+        """
+        Add a row from compact ``(text, data)`` pairs — strings become
+        inline buttons, existing ``InlineButton`` objects pass through.
+            kb.text_row(("Home", "nav_home"), ("Back", "nav_back"))
+        """
+        row = []
+        for item in pairs:
+            if isinstance(item, InlineButton):
+                row.append(item)
+            elif isinstance(item, (tuple, list)):
+                text, data = item[0], item[1] if len(item) > 1 else item[0]
+                if isinstance(data, bytes):
+                    data = data.decode("utf-8")
+                row.append(InlineButton(text=str(text), callback_data=data))
+            else:
+                row.append(InlineButton(text=str(item)))
+        self.buttons.append(row)
+        return self
+
+    def join(self, *others: 'InlineKeyboard') -> 'InlineKeyboard':
+        """Merge other keyboards' rows into this one."""
+        for other in others:
+            self.buttons.extend(other.buttons)
+        return self
+
+    @staticmethod
+    def from_rows(*rows: List[Union[InlineButton, tuple]]) -> 'InlineKeyboard':
+        """Build an inline keyboard from rows of buttons or (text, data) pairs."""
+        kb = InlineKeyboard(buttons=[])
+        for row in rows:
+            kb.add_row(*row)
+        return kb
+
 
 @dataclass
 class ReplyKeyboard:
