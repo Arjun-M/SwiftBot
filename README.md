@@ -238,22 +238,23 @@ async def test_start_handler():
 
 ## 🌟 v1.5.0 — The Standout Release
 
-v1.5 was built by studying the Telegram SDKs of other languages — Rust's
-`teloxide`, TypeScript's `grammy`, Go's `telebot`, Kotlin's `kotlin-telegram-bot`
-— and porting the features the Python ecosystem has been missing for years.
+v1.5 adds a full set of advanced framework capabilities: dependency-injected
+handler pipelines, declarative command specs, an outbound API transformer
+layer, middleware bundles with error boundaries, dispatch routing, typed
+wizards, graceful shutdown, a plugin registry, and composable filter algebra.
 The full documentation site lives in `docs/index.html`.
 
-| Feature | Module | Inspired by |
-| --- | --- | --- |
-| Declarative handler pipelines with **dependency injection** | `swiftbot.pipeline` | Rust `teloxide` / `dptree` |
-| Declarative typed command specs with auto `/help` | `swiftbot.commands` | Rust `teloxide` `BotCommands` |
-| **Outbound transformer layer** (auto typing, idempotency, Recorder) | `swiftbot.transformer` | TypeScript `grammy` `api.config.use` |
-| Middleware bundles with **error boundaries** | `swiftbot.composer` | TypeScript `grammy` `Composer` / `catch` |
-| Pre-handler dispatch table | `bot.route()` | TypeScript `grammy` `bot.route` |
-| Typed wizards with data carry | `swiftbot.wizard` | Rust `teloxide` `Dialogues` |
-| Graceful shutdown (signal + drain) | `bot.run_shutdown()` | Rust `teloxide` `enable_ctrlc_handler` |
-| First-party plugin registry | `swiftbot.plugins` | Go `telebot` built-in middlewares |
-| `F` filter algebra | `swiftbot.filters` (`F = ...`) | `aiogram` `F` ergonomics |
+| Feature | Module |
+| --- | --- |
+| Declarative handler pipelines with **dependency injection** | `swiftbot.pipeline` |
+| Declarative typed command specs with auto `/help` | `swiftbot.commands` |
+| **Outbound transformer layer** (auto typing, idempotency, Recorder) | `swiftbot.transformer` |
+| Middleware bundles with **error boundaries** | `swiftbot.composer` |
+| Pre-handler dispatch table | `bot.route()` |
+| Typed wizards with data carry | `swiftbot.wizard` |
+| Graceful shutdown (signal + drain) | `bot.run_shutdown()` |
+| First-party plugin registry | `swiftbot.plugins` |
+| `F` filter algebra | `swiftbot.filters` (`F = ...`) |
 
 ```python
 # Dependency-injected pipeline handler — no globals needed
@@ -291,7 +292,7 @@ MIT License - Copyright (c) 2025 Arjun-M/SwiftBot
 
 ## 🙏 Acknowledgments
 
-- Inspired by [Telethon](https://github.com/LonamiWebs/Telethon) Syntax
+- Designed with clean decorator ergonomics in mind
 - Built on [httpx](https://www.python-httpx.org/) for HTTP/2
 
 ---
