@@ -6,9 +6,9 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-BASE = Path(__file__).resolve().parents[1]
-RESULTS = BASE / "results" / "fair_public"
-OUT = BASE / "analysis"
+BASE = Path(__file__).resolve().parent
+RESULTS = BASE / "results" / "public"
+OUT = BASE / "reports"
 OUT.mkdir(exist_ok=True)
 
 NAMES = {
@@ -55,11 +55,11 @@ fields = [
     "throughput_vs_swiftbot", "latency_vs_swiftbot", "peak_rss_vs_swiftbot",
     "api_surface", "gc_mode",
 ]
-with (OUT / "fair_summary.csv").open("w", newline="", encoding="utf-8") as handle:
-    writer = csv.DictWriter(handle, fieldnames=fields)
+with (OUT / "summary.csv").open("w", newline="", encoding="utf-8") as handle:
+    writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
     writer.writeheader()
     writer.writerows({field: row[field] for field in fields} for row in primary)
-(OUT / "fair_summary.json").write_text(json.dumps(primary, indent=2) + "\n", encoding="utf-8")
+(OUT / "summary.json").write_text(json.dumps(primary, indent=2) + "\n", encoding="utf-8")
 
 scaling = []
 for framework, display_name in NAMES.items():
@@ -73,7 +73,7 @@ for framework, display_name in NAMES.items():
             "median_latency_microseconds_per_update": row["median_latency_microseconds_per_update"],
             "correct": row["correct"],
         })
-(OUT / "fair_scaling.json").write_text(json.dumps(scaling, indent=2) + "\n", encoding="utf-8")
+(OUT / "scaling.json").write_text(json.dumps(scaling, indent=2) + "\n", encoding="utf-8")
 
 plt.style.use("seaborn-v0_8-whitegrid")
 
@@ -89,7 +89,7 @@ ax.ticklabel_format(axis="x", style="plain")
 for bar, value in zip(bars, values):
     ax.text(value + max(values) * 0.012, bar.get_y() + bar.get_height() / 2, f"{value:,.0f}", va="center", fontsize=9)
 fig.tight_layout()
-fig.savefig(OUT / "fair_throughput_10routes.png", dpi=180)
+fig.savefig(OUT / "charts" / "fair_throughput_10routes.png", dpi=180)
 plt.close(fig)
 
 fig, ax = plt.subplots(figsize=(9, 5.5))
@@ -109,7 +109,7 @@ ax.set_title("Public raw-update route scaling; GC enabled")
 ax.set_xticks([1, 10, 50])
 ax.legend(frameon=True)
 fig.tight_layout()
-fig.savefig(OUT / "fair_scalability.png", dpi=180)
+fig.savefig(OUT / "charts" / "fair_scalability.png", dpi=180)
 plt.close(fig)
 
 ordered = sorted(primary, key=lambda row: row["peak_rss_mib"])
@@ -123,5 +123,5 @@ ax.set_title("Public raw-update memory workload — 10,000 updates; GC enabled")
 for bar, value in zip(bars, values):
     ax.text(value + max(values) * 0.012, bar.get_y() + bar.get_height() / 2, f"{value:.1f}", va="center", fontsize=9)
 fig.tight_layout()
-fig.savefig(OUT / "fair_memory_peak_rss.png", dpi=180)
+fig.savefig(OUT / "charts" / "fair_memory_peak_rss.png", dpi=180)
 plt.close(fig)

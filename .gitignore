@@ -44,5 +44,6 @@ Env.txt
 bot_state.json
 
 # Real benchmark output must be sanitized before publication
-tests/benchmark/results/**/real_telegram_swiftbot_local.json
-tests/benchmark/results/**/real_telegram_swiftbot_raw.json
+benchmark/results/raw/
+benchmark/venv*/
+benchmark/results/public/*local*.json

@@ -24,7 +24,7 @@ The benchmark uses ten exact-text routes, 100 warm-up updates, 2,000 measured up
 
 SwiftBot measured approximately 1.91× the pyTelegramBotAPI throughput, 2.10× python-telegram-bot, and 16.24× aiogram in this specific public raw-update workload. These ratios are **not universal framework speed claims**. The adapters are public and more comparable than the previous version, but their internals still differ: some frameworks construct typed update objects, perform validation, or run different middleware and scheduling paths.
 
-![Corrected public-path throughput](analysis/fair_throughput_10routes.png)
+![Corrected public-path throughput](charts/fair_throughput_10routes.png)
 
 ## Fairness rules and limitations
 
@@ -34,13 +34,13 @@ These calls are public and representative, but they are not implementation-ident
 
 The test excludes Telegram network latency, webhook servers, database and Redis calls, application business logic, large media payloads, production middleware stacks, logging, retries, and long-duration stability. The real Telegram test is reported separately and is not combined with local dispatch throughput.
 
-The complete rules are in [`docs/fair_methodology.md`](docs/fair_methodology.md).
+The complete rules are in the benchmark methodology described in the README.
 
 ## Route scaling
 
-The corrected sweep uses the same public paths with one, ten, and fifty exact-text routes. Results are stored under `results/fair_public/` and summarized in `analysis/fair_scaling.json` and `analysis/fair_scalability.png`.
+The corrected sweep uses the same public paths with one, ten, and fifty exact-text routes. Results are stored under `../results/public/` and summarized in `scaling.json` and `charts/fair_scalability.png`.
 
-![Corrected route scaling](analysis/fair_scalability.png)
+![Corrected route scaling](charts/fair_scalability.png)
 
 ## Memory and resource footprint
 
@@ -55,11 +55,11 @@ The resource benchmark uses a fresh process per framework, normal garbage collec
 
 SwiftBot had the lowest peak RSS in this run. These are process-level observations for this workload, not guarantees for arbitrary bots. RSS includes the interpreter and dependency graph.
 
-![Corrected peak RSS](analysis/fair_memory_peak_rss.png)
+![Corrected peak RSS](charts/fair_memory_peak_rss.png)
 
 ## Worker pool and backpressure
 
-The SwiftBot worker-pool test uses a 2 ms asynchronous handler delay, 400 updates, queue size 100, and three repeats per worker count. The latest pool outputs remain in `results/fair_public/pool_full.json`. The earlier measurements showed throughput increasing from approximately 437 updates/s at one worker to 2,839 updates/s at eight workers, with all updates completed correctly. A bounded-queue test accepted four updates, timed out sixteen under overload, completed all accepted work, and reported no silent loss.
+The SwiftBot worker-pool test uses a 2 ms asynchronous handler delay, 400 updates, queue size 100, and three repeats per worker count. The latest pool outputs remain in `../results/public/pool_full.json`. The earlier measurements showed throughput increasing from approximately 437 updates/s at one worker to 2,839 updates/s at eight workers, with all updates completed correctly. A bounded-queue test accepted four updates, timed out sixteen under overload, completed all accepted work, and reported no silent loss.
 
 The default pool configuration is 50 workers, queue size 1,000, dead-letter handling enabled, and a five-second backpressure timeout. Tune these values for deployment size and handler type. Async workers improve I/O concurrency but do not create CPU parallelism for CPU-bound handlers.
 
@@ -77,7 +77,7 @@ SwiftBot should be presented as a **promising low-overhead async Telegram framew
 
 ## Reproduction
 
-See [`README.md`](README.md) for pinned installs and commands. The benchmark scripts are in `scripts/`, corrected results are in `results/fair_public/`, and charts are in `analysis/`. Never commit Telegram credentials or unsanitized private real-test output.
+See [`../README.md`](../README.md) for pinned installs and commands. The benchmark runners are in `../`, corrected results are in `../results/public/`, and charts are in `charts/`. Never commit Telegram credentials or unsanitized private real-test output.
 
 ## References
 

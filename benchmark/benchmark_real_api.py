@@ -18,6 +18,20 @@ def read_token(path: Path) -> str:
     return raw
 
 
+def sanitize_result(result: dict) -> dict:
+    """Remove bot/chat identifiers while retaining benchmark metrics."""
+    safe = json.loads(json.dumps(result))
+    identity = safe.get("identity", {})
+    for key in ("id", "username", "first_name"):
+        identity.pop(key, None)
+    chat_check = safe.get("chat_check", {})
+    for key in ("id", "username", "title"):
+        chat_check.pop(key, None)
+    safety = safe.get("safety", {})
+    safety.pop("chat_id_used", None)
+    return safe
+
+
 def rss_kib() -> int:
     with open('/proc/self/status', encoding='utf-8') as handle:
         for line in handle:
@@ -81,6 +95,7 @@ async def main():
     parser.add_argument('--getchat-repeats', type=int, default=5)
     parser.add_argument('--getupdates-repeats', type=int, default=5)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--sanitize', action='store_true', help='Remove bot/chat identifiers before writing output.')
     args = parser.parse_args()
 
     # Import after argument parsing; no credential is printed.
@@ -187,8 +202,10 @@ async def main():
             'chat_id_used': args.chat_id,
         },
     }
-    args.output.write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
-    print(json.dumps(result, indent=2))
+    output = sanitize_result(result) if args.sanitize else result
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(output, indent=2) + '\n', encoding='utf-8')
+    print(json.dumps(output, indent=2))
 
 
 asyncio.run(main())
