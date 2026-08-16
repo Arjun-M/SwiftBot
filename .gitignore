@@ -44,6 +44,6 @@ Env.txt
 bot_state.json
 
 # Real benchmark output must be sanitized before publication
-benchmark/results/raw/
-benchmark/venv*/
-benchmark/results/public/*local*.json
+tests/benchmark/results/raw/
+tests/benchmark/venv*/
+tests/benchmark/results/public/*local*.json

@@ -30,7 +30,7 @@ SwiftBot is a strong fit for asynchronous, route-heavy bots where local dispatch
 | **Operational safeguards** | HTTP/2 pooling, retry-after handling, bounded backpressure, dead-letter handling, and typed Telegram errors reduce the amount of reliability plumbing bot authors must build themselves. | These are implemented in the connection pool, worker pool, exception hierarchy, and webhook server. |
 | **Network-free testing** | Handlers can be exercised without Telegram credentials or network calls, with outgoing API requests captured for assertions. | The built-in `TestClient` harness and the repository’s 212 passing tests provide the local testing path; 10 live-environment tests remain skipped without credentials. |
 
-The benchmark results are **controlled local measurements, not a universal claim that SwiftBot is faster for every production bot**. Framework choice should still account for ecosystem maturity, compatibility requirements, workload shape, network latency, and a project-specific load test. See the full [benchmark report](benchmark/reports/benchmark_report.md) and the [reproduction guide](benchmark/README.md) for methods, charts, raw results, and caveats.
+The benchmark results are **controlled local measurements, not a universal claim that SwiftBot is faster for every production bot**. Framework choice should still account for ecosystem maturity, compatibility requirements, workload shape, network latency, and a project-specific load test. See the complete [benchmark report and reproduction guide](tests/benchmark/README.md) for methods, charts, raw results, and caveats.
 
 ## Quick Start
 
@@ -178,9 +178,9 @@ assert client.outgoing[0]["method"] == "sendMessage"
 | [Webhooks](https://github.com/Arjun-M/SwiftBot/tree/main/docs/22_Webhooks.md) | aiohttp server with secret-token verification and metrics |
 | [Storage](https://github.com/Arjun-M/SwiftBot/tree/main/docs/17_StorageAndState.md) | In-memory, JSON-file, and Redis FSM backends |
 | [Exceptions](https://github.com/Arjun-M/SwiftBot/tree/main/docs/18_Exceptions.md) | Typed `ChatNotFound`, `TooManyRequests`, `Forbidden`, ... |
-| [Benchmarks](benchmark/README.md) | Reproducible dispatch, memory, worker-pool, backpressure, and read-only Telegram smoke tests with reports and graphs |
+| [Benchmarks](tests/benchmark/README.md) | Reproducible dispatch, memory, worker-pool, backpressure, and read-only Telegram smoke tests with reports and graphs |
 
-The complete documentation lives in the [`docs/`](https://github.com/Arjun-M/SwiftBot/tree/main/docs) folder. The benchmark suite is documented in [`benchmark/README.md`](benchmark/README.md), with the measured results summarized in [`benchmark/reports/benchmark_report.md`](benchmark/reports/benchmark_report.md).
+The complete documentation lives in the [`docs/`](https://github.com/Arjun-M/SwiftBot/tree/main/docs) folder. The complete benchmark report and reproduction guide are in [`tests/benchmark/README.md`](tests/benchmark/README.md).
 
 ## Contributing
 
