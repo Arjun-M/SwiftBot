@@ -1,0 +1,22 @@
+{
+  "benchmark": "public_raw_update_memory",
+  "framework": "swiftbot",
+  "routes": 10,
+  "updates": 10000,
+  "batch_size": 100,
+  "python": "3.12.3",
+  "gc_mode": "enabled",
+  "api_surface": "public TestClient.send_updates",
+  "process_start_rss_kib": 21892,
+  "after_build_rss_kib": 33304,
+  "after_workload_rss_kib": 33952,
+  "peak_sampled_rss_kib": 33952,
+  "build_rss_delta_kib": 11412,
+  "workload_rss_delta_kib": 648,
+  "peak_rss_delta_from_build_start_kib": 12060,
+  "ru_maxrss_kib": 33952,
+  "build_elapsed_ms": 151.480661,
+  "handler_hits": 10000,
+  "expected_handler_hits": 10000,
+  "correct": true
+}

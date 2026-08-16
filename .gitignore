@@ -35,4 +35,14 @@ Thumbs.db
 *.pem
 *.key
 *.json.lock
+*.secret
+*.secrets
+.env*
+Env.txt
+*token*
+*credential*
 bot_state.json
+
+# Real benchmark output must be sanitized before publication
+tests/benchmark/results/**/real_telegram_swiftbot_local.json
+tests/benchmark/results/**/real_telegram_swiftbot_raw.json

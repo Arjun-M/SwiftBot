@@ -1,0 +1,98 @@
+[
+  {
+    "framework": "swiftbot",
+    "display_name": "SwiftBot",
+    "routes": 1,
+    "median_throughput_updates_per_second": 19792.11862794225,
+    "median_latency_microseconds_per_update": 50.525161999999995,
+    "correct": true
+  },
+  {
+    "framework": "swiftbot",
+    "display_name": "SwiftBot",
+    "routes": 10,
+    "median_throughput_updates_per_second": 19803.07779831203,
+    "median_latency_microseconds_per_update": 50.497201000000004,
+    "correct": true
+  },
+  {
+    "framework": "swiftbot",
+    "display_name": "SwiftBot",
+    "routes": 50,
+    "median_throughput_updates_per_second": 18016.61109923416,
+    "median_latency_microseconds_per_update": 55.504334,
+    "correct": true
+  },
+  {
+    "framework": "aiogram",
+    "display_name": "aiogram",
+    "routes": 1,
+    "median_throughput_updates_per_second": 3616.8761706019727,
+    "median_latency_microseconds_per_update": 276.48168,
+    "correct": true
+  },
+  {
+    "framework": "aiogram",
+    "display_name": "aiogram",
+    "routes": 10,
+    "median_throughput_updates_per_second": 1218.9535264228614,
+    "median_latency_microseconds_per_update": 820.375821,
+    "correct": true
+  },
+  {
+    "framework": "aiogram",
+    "display_name": "aiogram",
+    "routes": 50,
+    "median_throughput_updates_per_second": 358.91805404514264,
+    "median_latency_microseconds_per_update": 2786.151292,
+    "correct": true
+  },
+  {
+    "framework": "ptb",
+    "display_name": "python-telegram-bot",
+    "routes": 1,
+    "median_throughput_updates_per_second": 9631.083373890628,
+    "median_latency_microseconds_per_update": 103.83047900000001,
+    "correct": true
+  },
+  {
+    "framework": "ptb",
+    "display_name": "python-telegram-bot",
+    "routes": 10,
+    "median_throughput_updates_per_second": 9431.772224436225,
+    "median_latency_microseconds_per_update": 106.024613,
+    "correct": true
+  },
+  {
+    "framework": "ptb",
+    "display_name": "python-telegram-bot",
+    "routes": 50,
+    "median_throughput_updates_per_second": 8807.37929444842,
+    "median_latency_microseconds_per_update": 113.54115300000001,
+    "correct": true
+  },
+  {
+    "framework": "telebot",
+    "display_name": "pyTelegramBotAPI",
+    "routes": 1,
+    "median_throughput_updates_per_second": 11339.486478881368,
+    "median_latency_microseconds_per_update": 88.187415,
+    "correct": true
+  },
+  {
+    "framework": "telebot",
+    "display_name": "pyTelegramBotAPI",
+    "routes": 10,
+    "median_throughput_updates_per_second": 10357.932871480012,
+    "median_latency_microseconds_per_update": 96.54436,
+    "correct": true
+  },
+  {
+    "framework": "telebot",
+    "display_name": "pyTelegramBotAPI",
+    "routes": 50,
+    "median_throughput_updates_per_second": 7925.91846910441,
+    "median_latency_microseconds_per_update": 126.168343,
+    "correct": true
+  }
+]

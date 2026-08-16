@@ -1,0 +1,28 @@
+{
+  "benchmark": "public_raw_update_dispatch",
+  "framework": "swiftbot",
+  "routes": 10,
+  "iterations_per_repeat": 1000,
+  "warmup_iterations": 50,
+  "repeats": 3,
+  "python": "3.12.3",
+  "gc_mode": "enabled",
+  "setup_ms": 181.381458,
+  "repeat_seconds": [
+    0.050497201,
+    0.060229408,
+    0.049832621
+  ],
+  "median_seconds": 0.050497201,
+  "p95_seconds": 0.0680151736,
+  "median_throughput_updates_per_second": 19803.07779831203,
+  "median_latency_microseconds_per_update": 50.497201000000004,
+  "handler_hits": 3050,
+  "expected_handler_hits": 3050,
+  "correct": true,
+  "adapter": {
+    "api_surface": "public TestClient.send_updates",
+    "worker_count": 1,
+    "matching": "exact text"
+  }
+}

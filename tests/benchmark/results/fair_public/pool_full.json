@@ -9,12 +9,12 @@
       "queue_size": 100,
       "repeats": 3,
       "repeat_seconds": [
-        0.928158647,
-        0.92538617,
-        0.943577869
+        0.903250742,
+        0.920676399,
+        0.912931633
       ],
-      "median_seconds": 0.928158647,
-      "median_throughput_updates_per_second": 430.96080750083235,
+      "median_seconds": 0.912931633,
+      "median_throughput_updates_per_second": 438.14891010573626,
       "completed_per_repeat": [
         400,
         400,
@@ -34,12 +34,12 @@
       "queue_size": 100,
       "repeats": 3,
       "repeat_seconds": [
-        0.482195641,
-        0.497660514,
-        0.485217215
+        0.474868562,
+        0.493536555,
+        0.476388507
       ],
-      "median_seconds": 0.485217215,
-      "median_throughput_updates_per_second": 824.3730593936161,
+      "median_seconds": 0.476388507,
+      "median_throughput_updates_per_second": 839.6508188641083,
       "completed_per_repeat": [
         400,
         400,
@@ -59,12 +59,12 @@
       "queue_size": 100,
       "repeats": 3,
       "repeat_seconds": [
-        0.256209279,
-        0.252962589,
-        0.255358934
+        0.252541019,
+        0.253124417,
+        0.255064022
       ],
-      "median_seconds": 0.255358934,
-      "median_throughput_updates_per_second": 1566.4225791293443,
+      "median_seconds": 0.253124417,
+      "median_throughput_updates_per_second": 1580.2505532289285,
       "completed_per_repeat": [
         400,
         400,
@@ -84,12 +84,12 @@
       "queue_size": 100,
       "repeats": 3,
       "repeat_seconds": [
-        0.141214117,
-        0.140622165,
-        0.139297161
+        0.141686839,
+        0.142664829,
+        0.143165021
       ],
-      "median_seconds": 0.140622165,
-      "median_throughput_updates_per_second": 2844.501789600523,
+      "median_seconds": 0.142664829,
+      "median_throughput_updates_per_second": 2803.774432730018,
       "completed_per_repeat": [
         400,
         400,
@@ -109,7 +109,7 @@
     "handler_delay_seconds": 0.05,
     "queue_size": 2,
     "backpressure_timeout_seconds": 0.005,
-    "submit_elapsed_seconds": 0.00598728,
+    "submit_elapsed_seconds": 0.006229406,
     "accepted": 4,
     "timed_out": 16,
     "other_outcomes": [],

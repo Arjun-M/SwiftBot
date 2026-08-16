@@ -1,0 +1,5 @@
+display_name,framework,median_throughput_updates_per_second,median_latency_microseconds_per_update,setup_ms,peak_rss_mib,build_rss_delta_mib,workload_rss_delta_mib,correct,throughput_vs_swiftbot,latency_vs_swiftbot,peak_rss_vs_swiftbot,api_surface,gc_mode
+SwiftBot,swiftbot,19803.07779831203,50.497201000000004,181.381458,33.15625,11.14453125,0.6328125,True,1.0,1.0,1.0,public TestClient.send_updates,enabled
+aiogram,aiogram,1218.9535264228614,820.375821,4142.809296,154.3828125,131.0859375,1.98046875,True,0.06155374123343404,16.245966207117103,4.6562205466541,public Dispatcher.feed_raw_update,enabled
+python-telegram-bot,ptb,9431.772224436225,106.024613,226.959024,39.921875,18.34375,0.25390625,True,0.4762780978035731,2.0996136597749246,1.204052780395853,public Application.process_update,enabled
+pyTelegramBotAPI,telebot,10357.932871480012,96.54436,232.76038,46.80859375,24.73828125,0.7734375,True,0.5230466181556332,1.9118754720682438,1.4117577756833177,public AsyncTeleBot.process_new_updates,enabled

@@ -5,111 +5,79 @@
 
 ## Executive stance
 
-> **SwiftBot is a strong candidate for greenfield, performance-sensitive asynchronous Telegram bots, but it should be adopted with a compatibility and load-test gate rather than treated as the safest mature default today.**
+> **SwiftBot has a measured low-overhead public update-processing path and a useful worker-pool design, but this benchmark is not evidence of universal end-to-end superiority.**
 
-The latest controlled offline run gave SwiftBot the highest local routing throughput, lowest dispatch latency, lowest measured peak RSS, and smallest framework distribution in this matrix. Its worker pool also scaled usefully for asynchronous handlers and demonstrated bounded backpressure with no silent loss of accepted work. The main adoption risk is project maturity and ecosystem depth, not the measured local execution path.
+The repository previously published a stronger speed claim based on SwiftBot’s private `_process_update()` path while competitors went through more parsing and object-construction work. That result has been replaced. The corrected benchmark uses public raw-update processing surfaces, exact-text matching, one logical worker, enabled garbage collection, identical synthetic Telegram-shaped updates, and correctness assertions.
 
-## Frameworks and versions
+SwiftBot still leads the corrected local workload, but the conclusion is narrower: it is a promising option for performance-sensitive greenfield asynchronous bots. The safer production recommendation remains to pilot it against the application’s own middleware, persistence, webhook, error, and network workload before migration.
 
-| Framework | Version | Documented model |
-|---|---:|---|
-| SwiftBot | 1.6.3 | Async-first Telegram framework with typed decorators, filters, FSM, HTTP/2 pooling, worker pool, typed errors, and testing harness |
-| aiogram | 3.30.0 | Fully asynchronous asyncio/aiohttp Telegram framework with typed models, filters, FSM, middleware, and webhooks |
-| python-telegram-bot | 22.8 | Async pure-Python Telegram interface with high-level `telegram.ext` classes, polling, webhooks, and type annotations |
-| pyTelegramBotAPI | 4.36.1 | Simple Telegram API library supporting synchronous and asynchronous APIs |
+## Corrected public raw-update benchmark
 
-Sources: [SwiftBot PyPI][1], [SwiftBot GitHub][2], [aiogram PyPI][3], [python-telegram-bot PyPI][4], and [pyTelegramBotAPI PyPI][5].
+The benchmark uses ten exact-text routes, 100 warm-up updates, 2,000 measured updates per repeat, five repeats, one logical worker, enabled Python garbage collection, and no Telegram network calls. Every framework receives the same synthetic update shape and the same no-I/O async handler. Every run reached the expected 10,100 handler invocations.
 
-## Offline dispatch results
+| Framework | Public processing path | Median throughput | Median latency/update | Peak RSS | Correct |
+|---|---|---:|---:|---:|---|
+| **SwiftBot 1.6.3** | `TestClient.send_updates` | **19,803 updates/s** | **50.5 µs** | **33.2 MiB** | Yes |
+| pyTelegramBotAPI 4.36.1 | `AsyncTeleBot.process_new_updates` | 10,358 updates/s | 96.5 µs | 46.8 MiB | Yes |
+| python-telegram-bot 22.8 | `Application.process_update` | 9,432 updates/s | 106.0 µs | 39.9 MiB | Yes |
+| aiogram 3.30.0 | `Dispatcher.feed_raw_update` | 1,219 updates/s | 820.4 µs | 154.4 MiB | Yes |
 
-The primary run used ten exact-text routes, a synthetic Telegram update stream, an async no-I/O handler, 250 warm-up updates, 5,000 updates per repeat, and seven repeats. No Telegram network call was made. Every framework routed the expected handler count correctly.
+SwiftBot measured approximately 1.91× the pyTelegramBotAPI throughput, 2.10× python-telegram-bot, and 16.24× aiogram in this specific public raw-update workload. These ratios are **not universal framework speed claims**. The adapters are public and more comparable than the previous version, but their internals still differ: some frameworks construct typed update objects, perform validation, or run different middleware and scheduling paths.
 
-| Framework | Median throughput | Median latency/update | Relative throughput vs SwiftBot | Setup/build time | Correctness |
-|---|---:|---:|---:|---:|---|
-| **SwiftBot 1.6.3** | **28,954 updates/s** | **34.5 µs** | **1.00×** | **145.1 ms** | Pass |
-| python-telegram-bot 22.8 | 8,919 updates/s | 112.1 µs | 0.308× | 218.2 ms | Pass |
-| pyTelegramBotAPI 4.36.1 | 6,734 updates/s | 148.5 µs | 0.233× | 275.8 ms | Pass |
-| aiogram 3.30.0 | 1,407 updates/s | 710.9 µs | 0.049× | 4,069.2 ms | Pass |
+![Corrected public-path throughput](analysis/fair_throughput_10routes.png)
 
-SwiftBot was approximately **3.25× faster than python-telegram-bot, 4.30× faster than pyTelegramBotAPI, and 20.6× faster than aiogram** in this narrow local routing workload. These numbers do not represent end-to-end production latency: Telegram network round trips, outbound API calls, business logic, databases, middleware, logging, and serialization can dominate real workloads.
+## Fairness rules and limitations
 
-![Throughput](analysis/throughput_10routes.png)
+The benchmark normalizes the input update structure, route count, exact-text matching intent, handler body, worker count, garbage-collection mode, warm-up, repeats, and correctness assertion. SwiftBot uses the public `TestClient.send_updates()` path, aiogram uses `Dispatcher.feed_raw_update`, python-telegram-bot uses `Application.process_update` after `Update.de_json`, and pyTelegramBotAPI uses `AsyncTeleBot.process_new_updates` after its update conversion.
 
-The route-scaling sweep also favored SwiftBot. Its median throughput was 30,276 updates/s with one route, 29,341 with ten routes, and 25,095 with fifty routes. The comparison values are stored in `results/*_1routes.json`, `results/*_10routes.json`, and `results/*_50routes.json`.
+These calls are public and representative, but they are not implementation-identical. A framework that constructs richer typed models is doing more work inside the measured path. The results therefore answer a practical question—how these installed versions process a Telegram-shaped raw update through their public offline APIs—not an abstract question about which architecture is intrinsically fastest.
 
-![Routing scalability](analysis/routing_scalability.png)
+The test excludes Telegram network latency, webhook servers, database and Redis calls, application business logic, large media payloads, production middleware stacks, logging, retries, and long-duration stability. The real Telegram test is reported separately and is not combined with local dispatch throughput.
 
-## Memory and disk footprint
+The complete rules are in [`docs/fair_methodology.md`](docs/fair_methodology.md).
 
-The memory test ran in a fresh process per framework with normal garbage collection enabled and streamed 10,000 updates. RSS includes the interpreter and dependencies; framework distribution size counts only files belonging to the named package.
+## Route scaling
 
-| Framework | Peak RSS | Build RSS delta | Workload RSS delta | Package size | Site-packages size |
-|---|---:|---:|---:|---:|---:|
-| **SwiftBot** | **32.9 MiB** | **11.4 MiB** | **0.26 MiB** | **0.93 MiB** | 25.85 MiB |
-| python-telegram-bot | 39.6 MiB | 18.4 MiB | 0.00 MiB | 6.75 MiB | **20.55 MiB** |
-| pyTelegramBotAPI | 46.0 MiB | 24.8 MiB | 0.00 MiB | 4.44 MiB | 28.03 MiB |
-| aiogram | 154.0 MiB | 131.1 MiB | 1.63 MiB | 5.76 MiB | 36.09 MiB |
+The corrected sweep uses the same public paths with one, ten, and fifty exact-text routes. Results are stored under `results/fair_public/` and summarized in `analysis/fair_scaling.json` and `analysis/fair_scalability.png`.
 
-SwiftBot had the lowest peak RSS in this run. The full site-packages footprint is not the smallest because dependency graphs differ. Memory results are deployment observations, not guarantees for arbitrary handler graphs.
+![Corrected route scaling](analysis/fair_scalability.png)
 
-![Peak RSS](analysis/memory_peak_rss.png)
+## Memory and resource footprint
 
-## Worker pool, concurrency, and backpressure
+The resource benchmark uses a fresh process per framework, normal garbage collection, ten routes, 10,000 updates, and 100-update batches through the same public raw-update surfaces.
 
-SwiftBot’s verified default configuration is a 50-worker async worker pool, queue size 1,000, dead-letter handling enabled, and a five-second backpressure timeout. Its HTTP connection pool is configured for 100 maximum connections, 50 keepalive connections, and HTTP/2 enabled by default.
+| Framework | Peak RSS | Build RSS delta | Workload RSS delta | Correct |
+|---|---:|---:|---:|---|
+| **SwiftBot** | **33.2 MiB** | **11.1 MiB** | **0.63 MiB** | Yes |
+| python-telegram-bot | 39.9 MiB | 18.3 MiB | 0.25 MiB | Yes |
+| pyTelegramBotAPI | 46.8 MiB | 24.7 MiB | 0.77 MiB | Yes |
+| aiogram | 154.4 MiB | 131.1 MiB | 1.98 MiB | Yes |
 
-The pool test used a 2 ms asynchronous handler delay, 400 updates, queue size 100, and three repeats per worker count. All updates completed correctly.
+SwiftBot had the lowest peak RSS in this run. These are process-level observations for this workload, not guarantees for arbitrary bots. RSS includes the interpreter and dependency graph.
 
-| Workers | Median completed throughput | Completion |
-|---:|---:|---|
-| 1 | 437 updates/s | 400/400 in every repeat |
-| 2 | 840 updates/s | 400/400 in every repeat |
-| 4 | 1,567 updates/s | 400/400 in every repeat |
-| 8 | **2,839 updates/s** | 400/400 in every repeat |
+![Corrected peak RSS](analysis/fair_memory_peak_rss.png)
 
-The eight-worker result was 6.5× the one-worker result, demonstrating useful scaling for I/O-like async handlers. The bounded queue test offered 20 updates to one worker with queue size two, 50 ms handler delay, and five-millisecond submit timeout. Four updates were accepted and completed, sixteen timed out, and no accepted work was silently lost.
+## Worker pool and backpressure
 
-![Worker pool scaling](analysis/swiftbot_pool_scaling.png)
+The SwiftBot worker-pool test uses a 2 ms asynchronous handler delay, 400 updates, queue size 100, and three repeats per worker count. The latest pool outputs remain in `results/fair_public/pool_full.json`. The earlier measurements showed throughput increasing from approximately 437 updates/s at one worker to 2,839 updates/s at eight workers, with all updates completed correctly. A bounded-queue test accepted four updates, timed out sixteen under overload, completed all accepted work, and reported no silent loss.
 
-The public `TestClient` harness routed all 5,100 expected handler calls correctly, but measured only 48.5 updates/s because its `drain()` implementation polls with a default 20 ms sleep. This is **test-harness overhead**, not SwiftBot core dispatch throughput; replacing polling with an awaitable queue-join mechanism would improve developer feedback.
+The default pool configuration is 50 workers, queue size 1,000, dead-letter handling enabled, and a five-second backpressure timeout. Tune these values for deployment size and handler type. Async workers improve I/O concurrency but do not create CPU parallelism for CPU-bound handlers.
 
-## Real Telegram API test
+## TestClient correction
 
-A separate real-environment run used SwiftBot’s actual HTTP/2-enabled connection pool and called only `getMe`, `getChat`, and `getUpdates`. It did not send messages, modify webhooks, acknowledge updates, or call administrative methods. Bot identity and the requested chat ID were verified successfully; the username comparison was case-insensitive. The raw credential and private identifiers were excluded from the publishable result.
+The public `TestClient.drain()` implementation previously polled `queue.empty()` with a default 20 ms sleep. That could return too early when a worker had taken a task but had not finished its handler, and it made the public harness look artificially slow. It now uses `asyncio.Queue.join()`, which waits for every submitted task to call `queue.task_done()`. A new regression test covers both a slow in-flight handler and a multi-update batch.
 
-| Real API test | Result |
-|---|---:|
-| `getMe`, 20 calls | 20/20 successful; median **641.4 ms**, p95 676.6 ms |
-| `getChat`, 5 calls | 5/5 successful; median **641.1 ms**, p95 659.9 ms |
-| `getUpdates`, 5 calls | 5/5 successful; typical latency approximately 639 ms |
-| Concurrent `getMe` at 1/2/4/8 | 1/1, 2/2, 4/4, 8/8 successful |
-| RSS before/after build | 27.6 → 33.2 MiB; **5.6 MiB delta** |
-| Connection-pool initialization | **0.20 ms** |
-| Write methods called | **None** |
+## Real Telegram API smoke test
 
-The real network round trip is roughly 640 ms, so framework-local differences are small compared with Telegram API latency. Full details are in [`REAL_TELEGRAM_REPORT.md`](REAL_TELEGRAM_REPORT.md), and the sanitized result is in `results/real_telegram_swiftbot_sanitized.json`.
+The separate real-environment test is intentionally read-only. It calls only `getMe`, `getChat`, and `getUpdates`; it does not send messages, modify webhooks, acknowledge updates, or call administrative methods. The previously verified run recorded approximately 641 ms median latency for both `getMe` and `getChat`, successful concurrent read calls, and no write methods. Real network latency dominates local dispatch differences, so this result is not used to rank framework speed.
 
-## Advantages and risks
+## Recommendation
 
-SwiftBot’s advantages are unusually strong local dispatch performance, low measured RSS, a small framework distribution, typed routing, persistent-state options, HTTP/2 pooling, retry handling, a built-in testing path, configurable worker concurrency, bounded backpressure, dead-letter handling, and a broad documented API surface.[1] [2]
-
-The principal risk is maturity. SwiftBot is newer and less established than aiogram or python-telegram-bot. Before mission-critical adoption, the project should establish stable release tags, API compatibility guarantees, migration guidance, production soak tests, failure-injection tests, and more ecosystem evidence.
-
-## Final decision matrix
-
-| Use case | Recommendation |
-|---|---|
-| Greenfield async bot where speed, typed APIs, and local resource use matter | **Adopt with a load-test gate** |
-| Constrained container or small deployment | **Strong candidate** |
-| Mature ecosystem and conservative API risk are the top priority | **Prefer python-telegram-bot or aiogram** |
-| CPU-bound handlers | **Use processes or external workers; async workers do not create CPU parallelism** |
-| Mission-critical migration today | **Pilot first; do not blind-migrate** |
-
-**Final stance:** SwiftBot has a credible technical performance advantage and is worth continuing as a high-performance Telegram framework. Its next priorities should be release maturity, compatibility guarantees, real production soak coverage, and a faster `TestClient` drain implementation, not merely additional speed claims.
+SwiftBot should be presented as a **promising low-overhead async Telegram framework with a configurable worker pool**, not as a universally 3–20× faster replacement. The corrected public-path result supports further development and targeted pilots. Before calling it production-ready for mission-critical workloads, the project should add long-running soak tests, webhook benchmarks, persistence and Redis tests, middleware-heavy cases, retry/error tests, and compatibility guarantees.
 
 ## Reproduction
 
-See [`README.md`](README.md) for pinned installation commands and test commands. Scripts are under `scripts/`, raw offline results under `results/`, and charts under `analysis/`. Never commit a token or an unsanitized real result.
+See [`README.md`](README.md) for pinned installs and commands. The benchmark scripts are in `scripts/`, corrected results are in `results/fair_public/`, and charts are in `analysis/`. Never commit Telegram credentials or unsanitized private real-test output.
 
 ## References
 
