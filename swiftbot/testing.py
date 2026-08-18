@@ -118,10 +118,10 @@ class FakePool(HTTPConnectionPool):
     async def close(self):
         pass
 
-    async def post(self, url: str, json=None, files=None):
+    async def post(self, url: str, json=None, data=None, files=None):
         """Record the request and serve a scripted/default response."""
         method = url.rsplit("/", 1)[-1]
-        params = json if json is not None else {}
+        params = json if json is not None else (data if data is not None else {})
         params = {k: __import__("json").loads(v)
                   if isinstance(v, str) and v[:1] in "{[" else v
                   for k, v in params.items()}

@@ -25,6 +25,13 @@ class User:
     can_join_groups: Optional[bool] = None
     can_read_all_group_messages: Optional[bool] = None
     supports_inline_queries: Optional[bool] = None
+    allows_users_to_create_topics: Optional[bool] = None
+    can_connect_to_business: Optional[bool] = None
+    can_manage_bots: Optional[bool] = None
+    has_main_web_app: Optional[bool] = None
+    has_topics_enabled: Optional[bool] = None
+    supports_guest_queries: Optional[bool] = None
+    supports_join_request_queries: Optional[bool] = None
 
     @classmethod
     def from_dict(cls, data: Optional[Dict]) -> Optional['User']:
@@ -43,6 +50,13 @@ class User:
             can_join_groups=data.get('can_join_groups'),
             can_read_all_group_messages=data.get('can_read_all_group_messages'),
             supports_inline_queries=data.get('supports_inline_queries'),
+            allows_users_to_create_topics=data.get('allows_users_to_create_topics'),
+            can_connect_to_business=data.get('can_connect_to_business'),
+            can_manage_bots=data.get('can_manage_bots'),
+            has_main_web_app=data.get('has_main_web_app'),
+            has_topics_enabled=data.get('has_topics_enabled'),
+            supports_guest_queries=data.get('supports_guest_queries'),
+            supports_join_request_queries=data.get('supports_join_request_queries'),
         )
 
 
@@ -80,6 +94,7 @@ class Chat:
     can_set_sticker_set: Optional[bool] = None
     linked_chat_id: Optional[int] = None
     location: Optional[Dict] = None
+    is_direct_messages: Optional[bool] = None
 
     @classmethod
     def from_dict(cls, data: Optional[Dict]) -> Optional['Chat']:
@@ -114,6 +129,7 @@ class Chat:
             can_set_sticker_set=data.get('can_set_sticker_set'),
             linked_chat_id=data.get('linked_chat_id'),
             location=data.get('location'),
+            is_direct_messages=data.get('is_direct_messages'),
             pinned_message=(
                 Message.from_dict(data['pinned_message'], _depth=0)
                 if isinstance(data.get('pinned_message'), dict) else None
@@ -197,6 +213,62 @@ class Message:
     video_chat_participants_invited: Optional[Dict] = None
     web_app_data: Optional[Dict] = None
     reply_markup: Optional[Dict] = None
+    business_connection_id: Optional[str] = None
+    message_thread_id: Optional[int] = None
+    direct_messages_topic: Optional[Dict] = None
+    sender_business_bot: Optional[User] = None
+    sender_tag: Optional[str] = None
+    sender_boost_count: Optional[int] = None
+    is_from_offline: Optional[bool] = None
+    effect_id: Optional[str] = None
+    external_reply: Optional[Dict] = None
+    forward_origin: Optional[Dict] = None
+    quote: Optional[Dict] = None
+    reply_to_story: Optional[Dict] = None
+    reply_to_checklist_task_id: Optional[int] = None
+    reply_to_poll_option_id: Optional[int] = None
+    link_preview_options: Optional[Dict] = None
+    rich_message: Optional[Dict] = None
+    live_photo: Optional[Dict] = None
+    ephemeral_message_id: Optional[int] = None
+    receiver_user: Optional[User] = None
+    guest_bot_caller_user: Optional[User] = None
+    guest_bot_caller_chat: Optional[Chat] = None
+    guest_query_id: Optional[str] = None
+    paid_media: Optional[Dict] = None
+    paid_message_price_changed: Optional[Dict] = None
+    paid_star_count: Optional[int] = None
+    refunded_payment: Optional[Dict] = None
+    checklist: Optional[Dict] = None
+    checklist_tasks_done: Optional[Dict] = None
+    checklist_tasks_added: Optional[Dict] = None
+    suggested_post_info: Optional[Dict] = None
+    suggested_post_approved: Optional[Dict] = None
+    suggested_post_declined: Optional[Dict] = None
+    suggested_post_approval_failed: Optional[Dict] = None
+    suggested_post_paid: Optional[Dict] = None
+    suggested_post_refunded: Optional[Dict] = None
+    gift: Optional[Dict] = None
+    unique_gift: Optional[Dict] = None
+    gift_upgrade_sent: Optional[Dict] = None
+    giveaway: Optional[Dict] = None
+    giveaway_created: Optional[Dict] = None
+    giveaway_winners: Optional[Dict] = None
+    giveaway_completed: Optional[Dict] = None
+    users_shared: Optional[Dict] = None
+    chat_background_set: Optional[Dict] = None
+    chat_owner_left: Optional[Dict] = None
+    chat_owner_changed: Optional[Dict] = None
+    boost_added: Optional[Dict] = None
+    community_chat_added: Optional[Dict] = None
+    community_chat_removed: Optional[Dict] = None
+    poll_option_added: Optional[Dict] = None
+    poll_option_deleted: Optional[Dict] = None
+    show_caption_above_media: Optional[bool] = None
+    direct_message_price_changed: Optional[Dict] = None
+    is_paid_post: Optional[bool] = None
+    story: Optional[Dict] = None
+    managed_bot_created: Optional[Dict] = None
 
     @classmethod
     def from_dict(cls, data: Optional[Dict], _depth: int = 0) -> Optional['Message']:
@@ -293,6 +365,62 @@ class Message:
             video_chat_participants_invited=data.get('video_chat_participants_invited'),
             web_app_data=data.get('web_app_data'),
             reply_markup=data.get('reply_markup'),
+            business_connection_id=data.get('business_connection_id'),
+            message_thread_id=data.get('message_thread_id'),
+            direct_messages_topic=data.get('direct_messages_topic'),
+            sender_business_bot=User.from_dict(data.get('sender_business_bot')),
+            sender_tag=data.get('sender_tag'),
+            sender_boost_count=data.get('sender_boost_count'),
+            is_from_offline=data.get('is_from_offline'),
+            effect_id=data.get('effect_id'),
+            external_reply=data.get('external_reply'),
+            forward_origin=data.get('forward_origin'),
+            quote=data.get('quote'),
+            reply_to_story=data.get('reply_to_story'),
+            reply_to_checklist_task_id=data.get('reply_to_checklist_task_id'),
+            reply_to_poll_option_id=data.get('reply_to_poll_option_id'),
+            link_preview_options=data.get('link_preview_options'),
+            rich_message=data.get('rich_message'),
+            live_photo=data.get('live_photo'),
+            ephemeral_message_id=data.get('ephemeral_message_id'),
+            receiver_user=User.from_dict(data.get('receiver_user')),
+            guest_bot_caller_user=User.from_dict(data.get('guest_bot_caller_user')),
+            guest_bot_caller_chat=Chat.from_dict(data.get('guest_bot_caller_chat')),
+            guest_query_id=data.get('guest_query_id'),
+            paid_media=data.get('paid_media'),
+            paid_message_price_changed=data.get('paid_message_price_changed'),
+            paid_star_count=data.get('paid_star_count'),
+            refunded_payment=data.get('refunded_payment'),
+            checklist=data.get('checklist'),
+            checklist_tasks_done=data.get('checklist_tasks_done'),
+            checklist_tasks_added=data.get('checklist_tasks_added'),
+            suggested_post_info=data.get('suggested_post_info'),
+            suggested_post_approved=data.get('suggested_post_approved'),
+            suggested_post_declined=data.get('suggested_post_declined'),
+            suggested_post_approval_failed=data.get('suggested_post_approval_failed'),
+            suggested_post_paid=data.get('suggested_post_paid'),
+            suggested_post_refunded=data.get('suggested_post_refunded'),
+            gift=data.get('gift'),
+            unique_gift=data.get('unique_gift'),
+            gift_upgrade_sent=data.get('gift_upgrade_sent'),
+            giveaway=data.get('giveaway'),
+            giveaway_created=data.get('giveaway_created'),
+            giveaway_winners=data.get('giveaway_winners'),
+            giveaway_completed=data.get('giveaway_completed'),
+            users_shared=data.get('users_shared'),
+            chat_background_set=data.get('chat_background_set'),
+            chat_owner_left=data.get('chat_owner_left'),
+            chat_owner_changed=data.get('chat_owner_changed'),
+            boost_added=data.get('boost_added'),
+            community_chat_added=data.get('community_chat_added'),
+            community_chat_removed=data.get('community_chat_removed'),
+            poll_option_added=data.get('poll_option_added'),
+            poll_option_deleted=data.get('poll_option_deleted'),
+            show_caption_above_media=data.get('show_caption_above_media'),
+            direct_message_price_changed=data.get('direct_message_price_changed'),
+            is_paid_post=data.get('is_paid_post'),
+            story=data.get('story'),
+            managed_bot_created=data.get('managed_bot_created'),
         )
 
 
@@ -431,6 +559,18 @@ class Poll:
     type: str
     allows_multiple_answers: bool
     correct_option_id: Optional[int] = None
+    correct_option_ids: Optional[List[int]] = None
+    allows_revoting: Optional[bool] = None
+    shuffle_options: Optional[bool] = None
+    allow_adding_options: Optional[bool] = None
+    hide_results_until_closes: Optional[bool] = None
+    question_entities: Optional[List[Dict]] = None
+    description: Optional[str] = None
+    description_entities: Optional[List[Dict]] = None
+    country_codes: Optional[List[str]] = None
+    members_only: Optional[bool] = None
+    media: Optional[Dict] = None
+    explanation_media: Optional[Dict] = None
     explanation: Optional[str] = None
     explanation_entities: Optional[List[Dict]] = None
     open_period: Optional[int] = None
@@ -451,6 +591,18 @@ class Poll:
             type=data.get('type', 'regular'),
             allows_multiple_answers=data.get('allows_multiple_answers', False),
             correct_option_id=data.get('correct_option_id'),
+            correct_option_ids=data.get('correct_option_ids'),
+            allows_revoting=data.get('allows_revoting'),
+            shuffle_options=data.get('shuffle_options'),
+            allow_adding_options=data.get('allow_adding_options'),
+            hide_results_until_closes=data.get('hide_results_until_closes'),
+            question_entities=data.get('question_entities'),
+            description=data.get('description'),
+            description_entities=data.get('description_entities'),
+            country_codes=data.get('country_codes'),
+            members_only=data.get('members_only'),
+            media=data.get('media'),
+            explanation_media=data.get('explanation_media'),
             explanation=data.get('explanation'),
             explanation_entities=data.get('explanation_entities'),
             open_period=data.get('open_period'),
@@ -554,7 +706,15 @@ class Update:
     my_chat_member: Optional[ChatMemberUpdated] = None
     chat_member: Optional[ChatMemberUpdated] = None
     chat_join_request: Optional[ChatJoinRequest] = None
-    # Bot API 2026 additions (9.6 / 10.0 / 10.2)
+    business_connection: Optional[Dict] = None
+    message_reaction: Optional[Dict] = None
+    message_reaction_count: Optional[Dict] = None
+    purchased_paid_media: Optional[Dict] = None
+    chat_boost: Optional[Dict] = None
+    removed_chat_boost: Optional[Dict] = None
+    managed_bot: Optional[Dict] = None
+    subscription: Optional[Dict] = None
+    # Backward-compatible aliases retained for older fixture payloads.
     managed_bot_created: Optional[Dict] = None
     managed_bot_updated: Optional[Dict] = None
     bot_subscription_updated: Optional[Dict] = None
@@ -591,8 +751,14 @@ class Update:
             my_chat_member=ChatMemberUpdated.from_dict(data.get('my_chat_member')),
             chat_member=ChatMemberUpdated.from_dict(data.get('chat_member')),
             chat_join_request=ChatJoinRequest.from_dict(data.get('chat_join_request')),
-            # Bot API 2026 additions — parseable fields become typed objects,
-            # everything else stays as a dict via ``raw``.
+            business_connection=data.get('business_connection'),
+            message_reaction=data.get('message_reaction'),
+            message_reaction_count=data.get('message_reaction_count'),
+            purchased_paid_media=data.get('purchased_paid_media'),
+            chat_boost=data.get('chat_boost'),
+            removed_chat_boost=data.get('removed_chat_boost'),
+            managed_bot=data.get('managed_bot'),
+            subscription=data.get('subscription'),
             managed_bot_created=data.get('managed_bot_created'),
             managed_bot_updated=data.get('managed_bot_updated'),
             bot_subscription_updated=data.get('bot_subscription_updated'),
@@ -634,6 +800,22 @@ class Update:
             return 'chat_member'
         elif self.chat_join_request:
             return 'chat_join_request'
+        elif self.business_connection:
+            return 'business_connection'
+        elif self.message_reaction:
+            return 'message_reaction'
+        elif self.message_reaction_count:
+            return 'message_reaction_count'
+        elif self.purchased_paid_media:
+            return 'purchased_paid_media'
+        elif self.chat_boost:
+            return 'chat_boost'
+        elif self.removed_chat_boost:
+            return 'removed_chat_boost'
+        elif self.managed_bot:
+            return 'managed_bot'
+        elif self.subscription:
+            return 'subscription'
         elif self.managed_bot_created:
             return 'managed_bot_created'
         elif self.managed_bot_updated:

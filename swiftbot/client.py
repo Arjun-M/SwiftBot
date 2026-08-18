@@ -283,6 +283,7 @@ class SwiftBot:
             "message_reaction", "message_reaction_count",
             "business_connection", "business_message", "edited_business_message",
             "deleted_business_messages", "purchased_paid_media",
+            "chat_boost", "removed_chat_boost", "managed_bot", "subscription",
             "managed_bot_created", "managed_bot_updated",
             "bot_subscription_updated", "guest_message", "purchase",
         }
@@ -857,6 +858,16 @@ class SwiftBot:
         """Close bot instance"""
         return await self.api.close()
 
+    @staticmethod
+    def _legacy_reply_parameters(message_id: Optional[int], allow_without_reply: bool):
+        """Translate legacy reply arguments to the current Bot API object."""
+        if message_id is None and not allow_without_reply:
+            return None
+        result = {"allow_sending_without_reply": allow_without_reply}
+        if message_id is not None:
+            result["message_id"] = message_id
+        return result
+
     # ============= Messaging =============
 
     async def send_message(self, chat_id: int, text: str, parse_mode: Optional[str] = None,
@@ -864,22 +875,36 @@ class SwiftBot:
                           disable_notification: bool = False, protect_content: bool = False,
                           reply_to_message_id: Optional[int] = None, 
                           allow_sending_without_reply: bool = False,
-                          reply_markup: Optional[Dict] = None):
-        """Send text message"""
+                          reply_markup: Optional[Dict] = None, **kwargs):
+        """Send text message.
+
+        Legacy reply arguments are converted to ``reply_parameters`` and the
+        legacy preview flag is converted to ``link_preview_options``.
+        """
+        reply_parameters = kwargs.pop("reply_parameters", None)
+        if reply_parameters is None and (
+            reply_to_message_id is not None or allow_sending_without_reply
+        ):
+            reply_parameters = {"allow_sending_without_reply": allow_sending_without_reply}
+            if reply_to_message_id is not None:
+                reply_parameters["message_id"] = reply_to_message_id
+        link_preview_options = kwargs.pop("link_preview_options", None)
+        if link_preview_options is None and disable_web_page_preview:
+            link_preview_options = {"is_disabled": True}
         return await self.api.send_message(
             chat_id=chat_id, text=text, parse_mode=parse_mode or self.parse_mode,
-            entities=entities, disable_web_page_preview=disable_web_page_preview,
+            entities=entities, link_preview_options=link_preview_options,
             disable_notification=disable_notification, protect_content=protect_content,
-            reply_to_message_id=reply_to_message_id,
-            allow_sending_without_reply=allow_sending_without_reply,
-            reply_markup=reply_markup
+            reply_parameters=reply_parameters, reply_markup=reply_markup, **kwargs
         )
 
     async def forward_message(self, chat_id: int, from_chat_id: int, message_id: int,
                              disable_notification: bool = False, protect_content: bool = False):
         """Forward message"""
-        return await self.api.forward_message(chat_id, from_chat_id, message_id,
-                                              disable_notification, protect_content)
+        return await self.api.forward_message(
+            chat_id=chat_id, from_chat_id=from_chat_id, message_id=message_id,
+            disable_notification=disable_notification, protect_content=protect_content
+        )
 
     async def copy_message(self, chat_id: int, from_chat_id: int, message_id: int,
                           caption: Optional[str] = None, parse_mode: Optional[str] = None,
@@ -890,9 +915,13 @@ class SwiftBot:
                           reply_markup: Optional[Dict] = None):
         """Copy message"""
         return await self.api.copy_message(
-            chat_id, from_chat_id, message_id, caption, parse_mode or self.parse_mode,
-            caption_entities, disable_notification, protect_content, reply_to_message_id,
-            allow_sending_without_reply, reply_markup
+            chat_id=chat_id, from_chat_id=from_chat_id, message_id=message_id,
+            caption=caption, parse_mode=parse_mode or self.parse_mode,
+            caption_entities=caption_entities, disable_notification=disable_notification,
+            protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     # ============= Media =============
@@ -905,9 +934,12 @@ class SwiftBot:
                         reply_markup: Optional[Dict] = None):
         """Send photo"""
         return await self.api.send_photo(
-            chat_id, photo, caption, parse_mode or self.parse_mode, caption_entities,
-            disable_notification, protect_content, reply_to_message_id,
-            allow_sending_without_reply, reply_markup
+            chat_id=chat_id, photo=photo, caption=caption,
+            parse_mode=parse_mode or self.parse_mode, caption_entities=caption_entities,
+            disable_notification=disable_notification, protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     async def send_audio(self, chat_id: int, audio, caption: Optional[str] = None,
@@ -920,9 +952,13 @@ class SwiftBot:
                         reply_markup: Optional[Dict] = None):
         """Send audio"""
         return await self.api.send_audio(
-            chat_id, audio, caption, parse_mode or self.parse_mode, caption_entities,
-            duration, performer, title, thumb, disable_notification, protect_content,
-            reply_to_message_id, allow_sending_without_reply, reply_markup
+            chat_id=chat_id, audio=audio, caption=caption,
+            parse_mode=parse_mode or self.parse_mode, caption_entities=caption_entities,
+            duration=duration, performer=performer, title=title, thumbnail=thumb,
+            disable_notification=disable_notification, protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     async def send_document(self, chat_id: int, document, thumb = None,
@@ -935,9 +971,13 @@ class SwiftBot:
                            reply_markup: Optional[Dict] = None):
         """Send document"""
         return await self.api.send_document(
-            chat_id, document, thumb, caption, parse_mode or self.parse_mode,
-            caption_entities, disable_content_type_detection, disable_notification,
-            protect_content, reply_to_message_id, allow_sending_without_reply, reply_markup
+            chat_id=chat_id, document=document, thumbnail=thumb, caption=caption,
+            parse_mode=parse_mode or self.parse_mode, caption_entities=caption_entities,
+            disable_content_type_detection=disable_content_type_detection,
+            disable_notification=disable_notification, protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     async def send_video(self, chat_id: int, video, duration: Optional[int] = None,
@@ -950,10 +990,13 @@ class SwiftBot:
                         reply_markup: Optional[Dict] = None):
         """Send video"""
         return await self.api.send_video(
-            chat_id, video, duration, width, height, thumb, caption,
-            parse_mode or self.parse_mode, caption_entities, supports_streaming,
-            disable_notification, protect_content, reply_to_message_id,
-            allow_sending_without_reply, reply_markup
+            chat_id=chat_id, video=video, duration=duration, width=width, height=height,
+            thumbnail=thumb, caption=caption, parse_mode=parse_mode or self.parse_mode,
+            caption_entities=caption_entities, supports_streaming=supports_streaming,
+            disable_notification=disable_notification, protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     async def send_animation(self, chat_id: int, animation, duration: Optional[int] = None,
@@ -967,9 +1010,13 @@ class SwiftBot:
                             reply_markup: Optional[Dict] = None):
         """Send animation"""
         return await self.api.send_animation(
-            chat_id, animation, duration, width, height, thumb, caption,
-            parse_mode or self.parse_mode, caption_entities, disable_notification,
-            protect_content, reply_to_message_id, allow_sending_without_reply, reply_markup
+            chat_id=chat_id, animation=animation, duration=duration, width=width,
+            height=height, thumbnail=thumb, caption=caption,
+            parse_mode=parse_mode or self.parse_mode, caption_entities=caption_entities,
+            disable_notification=disable_notification, protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     async def send_voice(self, chat_id: int, voice, caption: Optional[str] = None,
@@ -980,9 +1027,13 @@ class SwiftBot:
                         reply_markup: Optional[Dict] = None):
         """Send voice message"""
         return await self.api.send_voice(
-            chat_id, voice, caption, parse_mode or self.parse_mode, caption_entities,
-            duration, disable_notification, protect_content, reply_to_message_id,
-            allow_sending_without_reply, reply_markup
+            chat_id=chat_id, voice=voice, caption=caption,
+            parse_mode=parse_mode or self.parse_mode, caption_entities=caption_entities,
+            duration=duration, disable_notification=disable_notification,
+            protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     async def send_video_note(self, chat_id: int, video_note, duration: Optional[int] = None,
@@ -993,8 +1044,12 @@ class SwiftBot:
                              reply_markup: Optional[Dict] = None):
         """Send video note"""
         return await self.api.send_video_note(
-            chat_id, video_note, duration, length, thumb, disable_notification,
-            protect_content, reply_to_message_id, allow_sending_without_reply, reply_markup
+            chat_id=chat_id, video_note=video_note, duration=duration, length=length,
+            thumbnail=thumb, disable_notification=disable_notification,
+            protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     async def send_media_group(self, chat_id: int, media: List[Dict],
@@ -1003,8 +1058,11 @@ class SwiftBot:
                               allow_sending_without_reply: bool = False):
         """Send media group (album)"""
         return await self.api.send_media_group(
-            chat_id, media, disable_notification, protect_content,
-            reply_to_message_id, allow_sending_without_reply
+            chat_id=chat_id, media=media, disable_notification=disable_notification,
+            protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            )
         )
 
     async def send_location(self, chat_id: int, latitude: float, longitude: float,
@@ -1017,9 +1075,13 @@ class SwiftBot:
                            reply_markup: Optional[Dict] = None):
         """Send location"""
         return await self.api.send_location(
-            chat_id, latitude, longitude, horizontal_accuracy, live_period, heading,
-            proximity_alert_radius, disable_notification, protect_content,
-            reply_to_message_id, allow_sending_without_reply, reply_markup
+            chat_id=chat_id, latitude=latitude, longitude=longitude,
+            horizontal_accuracy=horizontal_accuracy, live_period=live_period,
+            heading=heading, proximity_alert_radius=proximity_alert_radius,
+            disable_notification=disable_notification, protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     async def send_venue(self, chat_id: int, latitude: float, longitude: float,
@@ -1033,9 +1095,13 @@ class SwiftBot:
                         reply_markup: Optional[Dict] = None):
         """Send venue"""
         return await self.api.send_venue(
-            chat_id, latitude, longitude, title, address, foursquare_id, foursquare_type,
-            google_place_id, google_place_type, disable_notification, protect_content,
-            reply_to_message_id, allow_sending_without_reply, reply_markup
+            chat_id=chat_id, latitude=latitude, longitude=longitude, title=title,
+            address=address, foursquare_id=foursquare_id, foursquare_type=foursquare_type,
+            google_place_id=google_place_id, google_place_type=google_place_type,
+            disable_notification=disable_notification, protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     async def send_contact(self, chat_id: int, phone_number: str, first_name: str,
@@ -1046,8 +1112,12 @@ class SwiftBot:
                           reply_markup: Optional[Dict] = None):
         """Send contact"""
         return await self.api.send_contact(
-            chat_id, phone_number, first_name, last_name, vcard, disable_notification,
-            protect_content, reply_to_message_id, allow_sending_without_reply, reply_markup
+            chat_id=chat_id, phone_number=phone_number, first_name=first_name,
+            last_name=last_name, vcard=vcard, disable_notification=disable_notification,
+            protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     async def send_poll(self, chat_id: int, question: str, options: List[str],
@@ -1063,10 +1133,17 @@ class SwiftBot:
                        reply_markup: Optional[Dict] = None):
         """Send poll"""
         return await self.api.send_poll(
-            chat_id, question, options, is_anonymous, type, allows_multiple_answers,
-            correct_option_id, explanation, explanation_parse_mode or self.parse_mode,
-            explanation_entities, open_period, close_date, is_closed, disable_notification,
-            protect_content, reply_to_message_id, allow_sending_without_reply, reply_markup
+            chat_id=chat_id, question=question, options=options,
+            is_anonymous=is_anonymous, type=type,
+            allows_multiple_answers=allows_multiple_answers,
+            correct_option_id=correct_option_id, explanation=explanation,
+            explanation_parse_mode=explanation_parse_mode or self.parse_mode,
+            explanation_entities=explanation_entities, open_period=open_period,
+            close_date=close_date, is_closed=is_closed,
+            disable_notification=disable_notification, protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     async def send_dice(self, chat_id: int, emoji: str = "🎲",
@@ -1076,8 +1153,11 @@ class SwiftBot:
                        reply_markup: Optional[Dict] = None):
         """Send dice"""
         return await self.api.send_dice(
-            chat_id, emoji, disable_notification, protect_content,
-            reply_to_message_id, allow_sending_without_reply, reply_markup
+            chat_id=chat_id, emoji=emoji, disable_notification=disable_notification,
+            protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     # ============= Chat Actions =============
@@ -1093,11 +1173,18 @@ class SwiftBot:
                                inline_message_id: Optional[str] = None,
                                parse_mode: Optional[str] = None, entities: Optional[List] = None,
                                disable_web_page_preview: bool = False,
-                               reply_markup: Optional[Dict] = None):
-        """Edit message text"""
+                               reply_markup: Optional[Dict] = None,
+                               rich_message: Optional[Dict] = None,
+                               link_preview_options: Optional[Dict] = None,
+                               **kwargs):
+        """Edit text or Rich Message content."""
+        if link_preview_options is None and disable_web_page_preview:
+            link_preview_options = {"is_disabled": True}
         return await self.api.edit_message_text(
-            text, chat_id, message_id, inline_message_id, parse_mode or self.parse_mode,
-            entities, disable_web_page_preview, reply_markup
+            text=text, chat_id=chat_id, message_id=message_id,
+            inline_message_id=inline_message_id, parse_mode=parse_mode or self.parse_mode,
+            entities=entities, link_preview_options=link_preview_options,
+            reply_markup=reply_markup, rich_message=rich_message, **kwargs
         )
 
     async def edit_message_caption(self, chat_id: Optional[int] = None,
@@ -1149,8 +1236,11 @@ class SwiftBot:
                           reply_markup: Optional[Dict] = None):
         """Send sticker"""
         return await self.api.send_sticker(
-            chat_id, sticker, disable_notification, protect_content,
-            reply_to_message_id, allow_sending_without_reply, reply_markup
+            chat_id=chat_id, sticker=sticker,
+            disable_notification=disable_notification, protect_content=protect_content,
+            reply_parameters=self._legacy_reply_parameters(
+                reply_to_message_id, allow_sending_without_reply
+            ), reply_markup=reply_markup
         )
 
     async def get_sticker_set(self, name: str):
@@ -1161,26 +1251,35 @@ class SwiftBot:
         """Get custom emoji stickers"""
         return await self.api.get_custom_emoji_stickers(custom_emoji_ids)
 
-    async def upload_sticker_file(self, user_id: int, png_sticker):
-        """Upload sticker file"""
-        return await self.api.upload_sticker_file(user_id, png_sticker)
+    async def upload_sticker_file(self, user_id: int, png_sticker,
+                                  sticker_format: str = "png"):
+        """Upload sticker file."""
+        return await self.api.upload_sticker_file(
+            user_id=user_id, sticker=png_sticker, sticker_format=sticker_format
+        )
 
     async def create_new_sticker_set(self, user_id: int, name: str, title: str,
                                     emojis: str, png_sticker = None, tgs_sticker = None,
                                     webm_sticker = None, sticker_type: str = "regular",
                                     mask_position: Optional[Dict] = None):
         """Create new sticker set"""
+        sticker, sticker_format = self._legacy_sticker_payload(
+            emojis, png_sticker, tgs_sticker, webm_sticker, mask_position
+        )
         return await self.api.create_new_sticker_set(
-            user_id, name, title, emojis, png_sticker, tgs_sticker, webm_sticker,
-            sticker_type, mask_position
+            user_id=user_id, name=name, title=title, stickers=[sticker],
+            sticker_format=sticker_format, sticker_type=sticker_type
         )
 
     async def add_sticker_to_set(self, user_id: int, name: str, emojis: str,
                                 png_sticker = None, tgs_sticker = None,
                                 webm_sticker = None, mask_position: Optional[Dict] = None):
         """Add sticker to set"""
+        sticker, _ = self._legacy_sticker_payload(
+            emojis, png_sticker, tgs_sticker, webm_sticker, mask_position
+        )
         return await self.api.add_sticker_to_set(
-            user_id, name, emojis, png_sticker, tgs_sticker, webm_sticker, mask_position
+            user_id=user_id, name=name, sticker=sticker
         )
 
     async def set_sticker_position_in_set(self, sticker: str, position: int):
@@ -1193,7 +1292,28 @@ class SwiftBot:
 
     async def set_sticker_set_thumb(self, name: str, user_id: int, thumb = None):
         """Set sticker set thumbnail"""
-        return await self.api.set_sticker_set_thumb(name, user_id, thumb)
+        return await self.api.set_sticker_set_thumbnail(
+            name=name, user_id=user_id, thumbnail=thumb
+        )
+
+    @staticmethod
+    def _legacy_sticker_payload(emojis, png_sticker, tgs_sticker, webm_sticker,
+                                mask_position=None):
+        if png_sticker is not None:
+            sticker, sticker_format = png_sticker, "static"
+        elif tgs_sticker is not None:
+            sticker, sticker_format = tgs_sticker, "animated"
+        elif webm_sticker is not None:
+            sticker, sticker_format = webm_sticker, "video"
+        else:
+            raise ValueError("one sticker file must be provided")
+        emoji_list = [emojis] if isinstance(emojis, str) else list(emojis or [])
+        return {
+            "sticker": sticker,
+            "format": sticker_format,
+            "emoji_list": emoji_list,
+            "mask_position": mask_position,
+        }, sticker_format
 
     # ============= Inline Mode =============
 
@@ -1203,9 +1323,15 @@ class SwiftBot:
                                   switch_pm_text: Optional[str] = None,
                                   switch_pm_parameter: Optional[str] = None):
         """Answer inline query"""
+        button = None
+        if switch_pm_text is not None or switch_pm_parameter is not None:
+            button = {
+                "text": switch_pm_text or "Open",
+                "start_parameter": switch_pm_parameter or "start",
+            }
         return await self.api.answer_inline_query(
-            inline_query_id, results, cache_time, is_personal, next_offset,
-            switch_pm_text, switch_pm_parameter
+            inline_query_id=inline_query_id, results=results, cache_time=cache_time,
+            is_personal=is_personal, next_offset=next_offset, button=button
         )
 
     async def answer_web_app_query(self, web_app_query_id: str, result: Dict):
@@ -1617,3 +1743,122 @@ class SwiftBot:
         """Direct access to TelegramAPI for advanced usage"""
         return self.api
 
+
+
+    # ============= Bot API 9.6–10.2 =============
+    async def approve_suggested_post(self, chat_id, message_id, send_date=None):
+        return await self.api.approve_suggested_post(chat_id, message_id, send_date)
+
+    async def decline_suggested_post(self, chat_id, message_id, comment=None):
+        return await self.api.decline_suggested_post(chat_id, message_id, comment)
+
+    async def create_chat_subscription_invite_link(self, chat_id, subscription_period,
+                                                    subscription_price, name=None):
+        return await self.api.create_chat_subscription_invite_link(
+            chat_id, subscription_period, subscription_price, name
+        )
+
+    async def edit_chat_subscription_invite_link(self, chat_id, invite_link, name=None):
+        return await self.api.edit_chat_subscription_invite_link(chat_id, invite_link, name)
+
+    async def ban_chat_sender_chat(self, chat_id, sender_chat_id):
+        return await self.api.ban_chat_sender_chat(chat_id, sender_chat_id)
+
+    async def unban_chat_sender_chat(self, chat_id, sender_chat_id):
+        return await self.api.unban_chat_sender_chat(chat_id, sender_chat_id)
+
+    async def delete_message_reaction(self, chat_id, message_id, user_id=None,
+                                      actor_chat_id=None):
+        return await self.api.delete_message_reaction(
+            chat_id, message_id, user_id, actor_chat_id
+        )
+
+    async def set_message_reaction(self, chat_id, message_id, reaction=None, is_big=None):
+        return await self.api.set_message_reaction(chat_id, message_id, reaction, is_big)
+
+    async def set_chat_member_tag(self, chat_id, user_id, tag=None):
+        return await self.api.set_chat_member_tag(chat_id, user_id, tag)
+
+    async def send_chat_action(self, chat_id, action, business_connection_id=None,
+                               message_thread_id=None):
+        return await self.api.send_chat_action(
+            chat_id, action, business_connection_id, message_thread_id
+        )
+
+    async def send_message_draft(self, chat_id, draft_id, text, parse_mode=None,
+                                 entities=None, message_thread_id=None):
+        return await self.api.send_message_draft(
+            chat_id, draft_id, text, parse_mode, entities, message_thread_id
+        )
+
+    async def send_paid_media(self, chat_id, star_count, media, payload=None, caption=None,
+                              parse_mode=None, caption_entities=None,
+                              show_caption_above_media=None, disable_notification=None,
+                              protect_content=None, reply_parameters=None,
+                              reply_markup=None, **kwargs):
+        return await self.api.send_paid_media(
+            chat_id=chat_id, star_count=star_count, media=media, payload=payload,
+            caption=caption, parse_mode=parse_mode or self.parse_mode,
+            caption_entities=caption_entities, show_caption_above_media=show_caption_above_media,
+            disable_notification=disable_notification, protect_content=protect_content,
+            reply_parameters=reply_parameters, reply_markup=reply_markup, **kwargs
+        )
+
+    async def send_checklist(self, chat_id, checklist, **kwargs):
+        return await self.api.send_checklist(chat_id=chat_id, checklist=checklist, **kwargs)
+
+    async def edit_message_checklist(self, chat_id, message_id, checklist, **kwargs):
+        return await self.api.edit_message_checklist(
+            chat_id=chat_id, message_id=message_id, checklist=checklist, **kwargs
+        )
+
+    async def edit_ephemeral_message_text(self, chat_id, ephemeral_message_id, text, **kwargs):
+        return await self.api.edit_ephemeral_message_text(
+            chat_id=chat_id, ephemeral_message_id=ephemeral_message_id, text=text, **kwargs
+        )
+
+    async def edit_ephemeral_message_media(self, chat_id, ephemeral_message_id, media, **kwargs):
+        return await self.api.edit_ephemeral_message_media(
+            chat_id=chat_id, ephemeral_message_id=ephemeral_message_id, media=media, **kwargs
+        )
+
+    async def edit_ephemeral_message_caption(self, chat_id, ephemeral_message_id,
+                                             caption=None, **kwargs):
+        return await self.api.edit_ephemeral_message_caption(
+            chat_id=chat_id, ephemeral_message_id=ephemeral_message_id,
+            caption=caption, **kwargs
+        )
+
+    async def edit_ephemeral_message_reply_markup(self, chat_id, ephemeral_message_id,
+                                                  **kwargs):
+        return await self.api.edit_ephemeral_message_reply_markup(
+            chat_id=chat_id, ephemeral_message_id=ephemeral_message_id, **kwargs
+        )
+
+    async def get_business_connection(self, business_connection_id):
+        return await self.api.get_business_connection(business_connection_id)
+
+    async def get_forum_topic_icon_stickers(self, **kwargs):
+        return await self.api.get_forum_topic_icon_stickers(**kwargs)
+
+    async def get_managed_bot_access_settings(self, user_id):
+        return await self.api.get_managed_bot_access_settings(user_id)
+
+    async def set_managed_bot_access_settings(self, user_id,
+                                              is_access_restricted=None,
+                                              added_user_ids=None):
+        return await self.api.set_managed_bot_access_settings(
+            user_id, is_access_restricted, added_user_ids
+        )
+
+    async def get_user_chat_boosts(self, chat_id, user_id):
+        return await self.api.get_user_chat_boosts(chat_id, user_id)
+
+    async def get_user_personal_chat_messages(self, user_id, limit=None):
+        return await self.api.get_user_personal_chat_messages(user_id, limit)
+
+    async def get_user_profile_audios(self, user_id, offset=None, limit=None):
+        return await self.api.get_user_profile_audios(user_id, offset, limit)
+
+    async def replace_sticker_in_set(self, user_id, name, old_sticker, sticker):
+        return await self.api.replace_sticker_in_set(user_id, name, old_sticker, sticker)

@@ -8,6 +8,8 @@
 
 SwiftBot is a fast, async-first Telegram bot framework built for simplicity and correctness. One decorator registers a handler, a rich `Context` object does the talking, and the framework quietly handles everything else — HTTP/2 connection pooling, `Retry-After` compliance, persistent state storage, and a fully typed error hierarchy. Everything is typed, everything is optional, and you never need an external database to get started.
 
+> **Telegram Bot API compatibility:** SwiftBot is compatible with **Telegram Bot API 10.2**.
+
 ```bash
 pip install swiftbot
 ```
