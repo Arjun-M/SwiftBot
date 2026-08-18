@@ -5,7 +5,7 @@ Licensed under MIT License
 
 A Telegram bot framework with clean decorator syntax, HTTP/2 connection
 pooling, persistent FSM storage, a test harness with a fake pool, typed
-callback data, deep linking utilities, full Bot API 2026 support — plus an
+callback data, deep linking utilities, Telegram Bot API 10.2 support — plus an
 advanced feature set: dependency-injected handler pipelines, declarative
 command specs with auto ``/help``, an outbound API transformer layer, composable
 middleware bundles with error boundaries, update-kind dispatch routing, typed
@@ -14,7 +14,7 @@ fluent reply builder, fallback handlers, graceful shutdown and first-party
 plugins.
 """
 
-__version__ = "1.6.3"
+__version__ = "1.6.4"
 __author__ = "Arjun-M"
 __license__ = "MIT"
 

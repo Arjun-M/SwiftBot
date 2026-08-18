@@ -206,6 +206,16 @@ class Message:
     document: Optional[Document] = None
     sticker: Optional[Dict] = None
     poll: Optional[Dict] = None
+    business_connection_id: Optional[str] = None
+    message_thread_id: Optional[int] = None
+    rich_message: Optional[Dict] = None
+    live_photo: Optional[Dict] = None
+    ephemeral_message_id: Optional[int] = None
+    receiver_user: Optional[User] = None
+    guest_query_id: Optional[str] = None
+    paid_media: Optional[Dict] = None
+    checklist: Optional[Dict] = None
+    suggested_post_info: Optional[Dict] = None
     raw: Dict = field(default_factory=dict, repr=False)
 
     @classmethod
@@ -232,6 +242,16 @@ class Message:
             document=Document.from_dict(data["document"]) if "document" in data else None,
             sticker=data.get("sticker"),
             poll=data.get("poll"),
+            business_connection_id=data.get("business_connection_id"),
+            message_thread_id=data.get("message_thread_id"),
+            rich_message=data.get("rich_message"),
+            live_photo=data.get("live_photo"),
+            ephemeral_message_id=data.get("ephemeral_message_id"),
+            receiver_user=User.from_dict(data.get("receiver_user")),
+            guest_query_id=data.get("guest_query_id"),
+            paid_media=data.get("paid_media"),
+            checklist=data.get("checklist"),
+            suggested_post_info=data.get("suggested_post_info"),
             raw=data,
         )
 
@@ -279,3 +299,81 @@ class InlineKeyboardMarkup:
         if self.is_personal:
             data["is_personal"] = True
         return data
+
+
+@dataclass
+class RichText:
+    """Generic typed rich-text node accepted by Bot API Rich Messages."""
+    type: str = "text"
+    text: Optional[str] = None
+    fields: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = dict(self.fields)
+        result["type"] = self.type
+        if self.text is not None:
+            result["text"] = self.text
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Optional[Dict[str, Any]]) -> Optional["RichText"]:
+        if not isinstance(data, dict):
+            return None
+        fields = dict(data)
+        node_type = fields.pop("type", "text")
+        text = fields.pop("text", None)
+        return cls(type=node_type, text=text, fields=fields)
+
+
+@dataclass
+class RichBlock:
+    """Generic typed rich-message block with forward-compatible fields."""
+    type: str = "paragraph"
+    fields: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = dict(self.fields)
+        result["type"] = self.type
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Optional[Dict[str, Any]]) -> Optional["RichBlock"]:
+        if not isinstance(data, dict):
+            return None
+        fields = dict(data)
+        node_type = fields.pop("type", "paragraph")
+        return cls(type=node_type, fields=fields)
+
+
+@dataclass
+class RichMessage:
+    """Typed, forward-compatible representation of an outgoing Rich Message."""
+    text: Optional[RichText] = None
+    blocks: List[RichBlock] = field(default_factory=list)
+    media: Optional[Dict[str, Any]] = None
+    fields: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = dict(self.fields)
+        if self.text is not None:
+            result["text"] = self.text.to_dict() if hasattr(self.text, "to_dict") else self.text
+        if self.blocks:
+            result["blocks"] = [
+                block.to_dict() if hasattr(block, "to_dict") else block
+                for block in self.blocks
+            ]
+        if self.media is not None:
+            result["media"] = self.media
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Optional[Dict[str, Any]]) -> Optional["RichMessage"]:
+        if not isinstance(data, dict):
+            return None
+        fields = dict(data)
+        text_data = fields.pop("text", None)
+        blocks_data = fields.pop("blocks", [])
+        media = fields.pop("media", None)
+        text = RichText.from_dict(text_data) if isinstance(text_data, dict) else text_data
+        blocks = [RichBlock.from_dict(item) for item in blocks_data if isinstance(item, dict)]
+        return cls(text=text, blocks=blocks, media=media, fields=fields)

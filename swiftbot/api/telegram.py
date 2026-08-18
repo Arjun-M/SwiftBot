@@ -2,7 +2,7 @@
 Complete Telegram Bot API wrapper - Part 1: Core & Messaging
 Copyright (c) 2025 Arjun-M/SwiftBot
 
-Complete implementation of Telegram Bot API 7.0+
+Complete implementation of Telegram Bot API 10.2
 Reference: https://core.telegram.org/bots/api
 """
 
@@ -53,7 +53,7 @@ class InputFile:
 
 class TelegramAPI:
     """
-    Complete Telegram Bot API implementation with ALL methods.
+    Telegram Bot API 10.2 implementation with current endpoint and model coverage.
 
     Covers:
     - Getting Updates
@@ -120,17 +120,34 @@ class TelegramAPI:
             except _RecorderError as scripted_err:
                 raise TelegramError.from_response(scripted_err.error_body)
 
-        # Convert objects to JSON
+        # Convert typed models and structured values to Bot API JSON.
+        def _json_ready(value):
+            if isinstance(value, InputFile):
+                return value
+            if hasattr(value, "to_dict") and callable(value.to_dict):
+                return _json_ready(value.to_dict())
+            if isinstance(value, dict):
+                return {k: _json_ready(v) for k, v in value.items()}
+            if isinstance(value, (list, tuple)):
+                return [_json_ready(v) for v in value]
+            return value
+
         for key, value in params.items():
+            value = _json_ready(value)
             if isinstance(value, (dict, list)):
                 params[key] = json.dumps(value)
+            else:
+                params[key] = value
 
         # Multipart upload when an InputFile is present
         files = {k: v for k, v in params.items() if isinstance(v, InputFile)}
         if files:
             fields = {k: v for k, v in params.items() if not isinstance(v, InputFile)}
+            # Multipart requests must put scalar/serialized fields in ``data``.
+            # Sending them through ``json`` alongside ``files`` is not a valid
+            # Bot API multipart payload.
             response = await self.pool.post(
-                url, json=fields if fields else None,
+                url, data=fields if fields else None,
                 files={k: (v.filename, v.file) for k, v in files.items()},
             )
         else:
@@ -282,6 +299,12 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
+        direct_messages_topic_id: Optional[int] = None,
+        suggested_post_parameters: Optional[Dict] = None,
+        message_effect_id: Optional[str] = None,
+        allow_paid_broadcast: Optional[bool] = None,
+        receiver_user_id: Optional[int] = None,
+        callback_query_id: Optional[str] = None,
     ):
         """
         Send text message.
@@ -315,6 +338,12 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            direct_messages_topic_id=direct_messages_topic_id,
+            suggested_post_parameters=suggested_post_parameters,
+            message_effect_id=message_effect_id,
+            allow_paid_broadcast=allow_paid_broadcast,
+            receiver_user_id=receiver_user_id,
+            callback_query_id=callback_query_id,
         )
 
     async def forward_message(
@@ -325,7 +354,8 @@ class TelegramAPI:
         disable_notification: Optional[bool] = None,
         protect_content: Optional[bool] = None,
         message_thread_id: Optional[int] = None,
-    ):
+
+        **extra):
         """
         Forward message from one chat to another.
 
@@ -340,6 +370,7 @@ class TelegramAPI:
             disable_notification=disable_notification,
             protect_content=protect_content,
             message_thread_id=message_thread_id,
+            **extra
         )
 
     async def forward_messages(
@@ -350,7 +381,8 @@ class TelegramAPI:
         disable_notification: Optional[bool] = None,
         protect_content: Optional[bool] = None,
         message_thread_id: Optional[int] = None,
-    ):
+
+        **extra):
         """
         Forward multiple messages at once.
 
@@ -365,6 +397,7 @@ class TelegramAPI:
             disable_notification=disable_notification,
             protect_content=protect_content,
             message_thread_id=message_thread_id,
+            **extra
         )
 
     async def copy_message(
@@ -380,7 +413,8 @@ class TelegramAPI:
         reply_parameters: Optional[Dict] = None,
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
-    ):
+
+        **extra):
         """
         Copy message to another chat.
 
@@ -400,6 +434,7 @@ class TelegramAPI:
             reply_parameters=reply_parameters,
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
+            **extra
         )
 
     async def copy_messages(
@@ -411,7 +446,8 @@ class TelegramAPI:
         protect_content: Optional[bool] = None,
         remove_caption: Optional[bool] = None,
         message_thread_id: Optional[int] = None,
-    ):
+
+        **extra):
         """
         Copy multiple messages at once.
 
@@ -427,6 +463,7 @@ class TelegramAPI:
             protect_content=protect_content,
             remove_caption=remove_caption,
             message_thread_id=message_thread_id,
+            **extra
         )
 
     # ==========================================
@@ -447,7 +484,8 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Send photo"""
         return await self._request(
             "sendPhoto",
@@ -463,6 +501,7 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def send_audio(
@@ -482,7 +521,8 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Send audio file"""
         return await self._request(
             "sendAudio",
@@ -501,6 +541,7 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def send_document(
@@ -518,7 +559,8 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Send document"""
         return await self._request(
             "sendDocument",
@@ -535,6 +577,7 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def send_video(
@@ -556,7 +599,8 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Send video"""
         return await self._request(
             "sendVideo",
@@ -577,6 +621,7 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def send_animation(
@@ -597,7 +642,8 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Send animation (GIF or H.264/MPEG-4 AVC video without sound)"""
         return await self._request(
             "sendAnimation",
@@ -617,6 +663,7 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def send_voice(
@@ -633,7 +680,8 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Send voice message"""
         return await self._request(
             "sendVoice",
@@ -649,6 +697,7 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def send_video_note(
@@ -690,7 +739,8 @@ class TelegramAPI:
         reply_parameters: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Send group of photos, videos, documents or audios as an album"""
         return await self._request(
             "sendMediaGroup",
@@ -701,6 +751,7 @@ class TelegramAPI:
             reply_parameters=reply_parameters,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def send_location(
@@ -718,7 +769,8 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Send point on the map"""
         return await self._request(
             "sendLocation",
@@ -735,6 +787,7 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def send_venue(
@@ -754,7 +807,8 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Send information about a venue"""
         return await self._request(
             "sendVenue",
@@ -773,6 +827,7 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def send_contact(
@@ -788,7 +843,8 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Send phone contact"""
         return await self._request(
             "sendContact",
@@ -803,6 +859,7 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def send_poll(
@@ -826,20 +883,51 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
+        correct_option_ids: Optional[List[int]] = None,
+        question_parse_mode: Optional[str] = None,
+        question_entities: Optional[List[Dict]] = None,
+        allows_revoting: Optional[bool] = None,
+        shuffle_options: Optional[bool] = None,
+        allow_adding_options: Optional[bool] = None,
+        hide_results_until_closes: Optional[bool] = None,
+        description: Optional[str] = None,
+        description_parse_mode: Optional[str] = None,
+        description_entities: Optional[List[Dict]] = None,
+        members_only: Optional[bool] = None,
+        country_codes: Optional[List[str]] = None,
+        media: Optional[Dict] = None,
+        explanation_media: Optional[Dict] = None,
+        message_effect_id: Optional[str] = None,
+        allow_paid_broadcast: Optional[bool] = None,
     ):
-        """Send a native poll"""
+        """Send a native poll using the current Bot API schema."""
+        if correct_option_ids is None and correct_option_id is not None:
+            correct_option_ids = [correct_option_id]
         return await self._request(
             "sendPoll",
             chat_id=chat_id,
             question=question,
+            question_parse_mode=question_parse_mode,
+            question_entities=question_entities,
             options=options,
             is_anonymous=is_anonymous,
             type=type,
             allows_multiple_answers=allows_multiple_answers,
-            correct_option_id=correct_option_id,
+            allows_revoting=allows_revoting,
+            correct_option_ids=correct_option_ids,
+            shuffle_options=shuffle_options,
+            allow_adding_options=allow_adding_options,
+            hide_results_until_closes=hide_results_until_closes,
             explanation=explanation,
             explanation_parse_mode=explanation_parse_mode,
             explanation_entities=explanation_entities,
+            explanation_media=explanation_media,
+            description=description,
+            description_parse_mode=description_parse_mode,
+            description_entities=description_entities,
+            media=media,
+            members_only=members_only,
+            country_codes=country_codes,
             open_period=open_period,
             close_date=close_date,
             is_closed=is_closed,
@@ -849,6 +937,8 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            message_effect_id=message_effect_id,
+            allow_paid_broadcast=allow_paid_broadcast,
         )
 
     async def send_dice(
@@ -861,7 +951,8 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Send animated emoji (dice, darts, basketball, etc.)"""
         return await self._request(
             "sendDice",
@@ -873,6 +964,7 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     # ==========================================
@@ -890,8 +982,9 @@ class TelegramAPI:
         link_preview_options: Optional[Dict] = None,
         reply_markup: Optional[Dict] = None,
         business_connection_id: Optional[str] = None,
+        rich_message: Optional[Dict] = None,
     ):
-        """Edit text message"""
+        """Edit text or Rich Message content."""
         return await self._request(
             "editMessageText",
             chat_id=chat_id,
@@ -903,6 +996,7 @@ class TelegramAPI:
             link_preview_options=link_preview_options,
             reply_markup=reply_markup,
             business_connection_id=business_connection_id,
+            rich_message=rich_message,
         )
 
     async def edit_message_caption(
@@ -915,7 +1009,8 @@ class TelegramAPI:
         caption_entities: Optional[List[Dict]] = None,
         reply_markup: Optional[Dict] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Edit caption of message"""
         return await self._request(
             "editMessageCaption",
@@ -927,6 +1022,7 @@ class TelegramAPI:
             caption_entities=caption_entities,
             reply_markup=reply_markup,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def edit_message_media(
@@ -961,7 +1057,8 @@ class TelegramAPI:
         proximity_alert_radius: Optional[int] = None,
         reply_markup: Optional[Dict] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Edit live location message"""
         return await self._request(
             "editMessageLiveLocation",
@@ -975,6 +1072,7 @@ class TelegramAPI:
             proximity_alert_radius=proximity_alert_radius,
             reply_markup=reply_markup,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def stop_message_live_location(
@@ -1060,7 +1158,8 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Send sticker"""
         return await self._request(
             "sendSticker",
@@ -1073,6 +1172,7 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def get_sticker_set(self, name: str):
@@ -1185,13 +1285,15 @@ class TelegramAPI:
         name: str,
         user_id: int,
         thumbnail: Optional[Any] = None,
-    ):
+
+        **extra):
         """Set sticker set thumbnail"""
         return await self._request(
             "setStickerSetThumbnail",
             name=name,
             user_id=user_id,
             thumbnail=thumbnail,
+            **extra
         )
 
     async def set_custom_emoji_sticker_set_thumbnail(
@@ -1279,7 +1381,8 @@ class TelegramAPI:
         reply_parameters: Optional[Dict] = None,
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
-    ):
+
+        **extra):
         """Send invoice"""
         return await self._request(
             "sendInvoice",
@@ -1310,6 +1413,7 @@ class TelegramAPI:
             reply_parameters=reply_parameters,
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
+            **extra
         )
 
     async def create_invoice_link(
@@ -1334,7 +1438,8 @@ class TelegramAPI:
         send_phone_number_to_provider: Optional[bool] = None,
         send_email_to_provider: Optional[bool] = None,
         is_flexible: Optional[bool] = None,
-    ):
+
+        **extra):
         """Create invoice link"""
         return await self._request(
             "createInvoiceLink",
@@ -1358,6 +1463,7 @@ class TelegramAPI:
             send_phone_number_to_provider=send_phone_number_to_provider,
             send_email_to_provider=send_email_to_provider,
             is_flexible=is_flexible,
+            **extra
         )
 
     async def answer_shipping_query(
@@ -1404,7 +1510,8 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         message_thread_id: Optional[int] = None,
         business_connection_id: Optional[str] = None,
-    ):
+
+        **extra):
         """Send game"""
         return await self._request(
             "sendGame",
@@ -1416,6 +1523,7 @@ class TelegramAPI:
             reply_markup=reply_markup,
             message_thread_id=message_thread_id,
             business_connection_id=business_connection_id,
+            **extra
         )
 
     async def set_game_score(
@@ -1611,9 +1719,11 @@ class TelegramAPI:
         """Get chat information"""
         return await self._request("getChat", chat_id=chat_id)
 
-    async def get_chat_administrators(self, chat_id: Union[int, str]):
+    async def get_chat_administrators(self, chat_id: Union[int, str],
+        **extra):
         """Get chat administrators"""
-        return await self._request("getChatAdministrators", chat_id=chat_id)
+        return await self._request("getChatAdministrators", chat_id=chat_id,
+            **extra)
 
     async def get_chat_member_count(self, chat_id: Union[int, str]):
         """Get number of members in chat"""
@@ -1706,7 +1816,8 @@ class TelegramAPI:
         can_edit_stories: Optional[bool] = None,
         can_delete_stories: Optional[bool] = None,
         can_manage_topics: Optional[bool] = None,
-    ):
+
+        **extra):
         """Promote chat member"""
         return await self._request(
             "promoteChatMember",
@@ -1727,6 +1838,7 @@ class TelegramAPI:
             can_edit_stories=can_edit_stories,
             can_delete_stories=can_delete_stories,
             can_manage_topics=can_manage_topics,
+            **extra
         )
 
     async def set_chat_administrator_custom_title(
@@ -1856,25 +1968,29 @@ class TelegramAPI:
         chat_id: Union[int, str],
         message_id: int,
         disable_notification: Optional[bool] = None,
-    ):
+
+        **extra):
         """Pin chat message"""
         return await self._request(
             "pinChatMessage",
             chat_id=chat_id,
             message_id=message_id,
             disable_notification=disable_notification,
+            **extra
         )
 
     async def unpin_chat_message(
         self,
         chat_id: Union[int, str],
         message_id: Optional[int] = None,
-    ):
+
+        **extra):
         """Unpin chat message"""
         return await self._request(
             "unpinChatMessage",
             chat_id=chat_id,
             message_id=message_id,
+            **extra
         )
 
     async def unpin_all_chat_messages(self, chat_id: Union[int, str]):
@@ -2029,56 +2145,54 @@ class TelegramAPI:
 
     # ---------- Managed Bots (Bot API 9.6) ----------
 
-    async def get_managed_bot_token(self, managed_bot_token_request_id: str):
-        """
-        Get a token for a managed bot (Bot API 9.6, April 2026).
+    async def get_managed_bot_token(self, user_id: Optional[int] = None,
+                                    managed_bot_token_request_id: Optional[str] = None,
+                                    **extra):
+        """Get the token for a managed bot."""
+        params = {"user_id": user_id}
+        if user_id is None:
+            params["managed_bot_token_request_id"] = managed_bot_token_request_id
+        params.update({k: v for k, v in extra.items() if v is not None})
+        return await self._request("getManagedBotToken", **params)
 
-        Returns a ``ManagedBotToken`` object containing the bot token that
-        can be used with this bot token for the managed bot.
-        """
-        return await self._request(
-            "getManagedBotToken",
-            managed_bot_token_request_id=managed_bot_token_request_id,
-        )
-
-    async def replace_managed_bot_token(self, managed_bot_token_request_id: str):
-        """
-        Replace the token for a managed bot (Bot API 9.6, April 2026).
-        """
-        return await self._request(
-            "replaceManagedBotToken",
-            managed_bot_token_request_id=managed_bot_token_request_id,
-        )
+    async def replace_managed_bot_token(self, user_id: Optional[int] = None,
+                                        managed_bot_token_request_id: Optional[str] = None,
+                                        **extra):
+        """Replace the token for a managed bot."""
+        params = {"user_id": user_id}
+        if user_id is None:
+            params["managed_bot_token_request_id"] = managed_bot_token_request_id
+        params.update({k: v for k, v in extra.items() if v is not None})
+        return await self._request("replaceManagedBotToken", **params)
 
     # ---------- Guest Mode (Bot API 10.0) ----------
 
     async def answer_guest_query(
         self,
         guest_query_id: str,
+        result: Optional[Dict] = None,
         message: Optional[Dict] = None,
+        **extra,
     ):
-        """
-        Answer a guest query in Guest Mode (Bot API 10.0, May 2026).
-
-        Args:
-            guest_query_id: Unique identifier for the query to answer
-            message: Message to send to the guest (see GuestModeMessage format)
-        """
+        """Answer a guest query using the current result payload."""
         params: Dict[str, Any] = {"guest_query_id": guest_query_id}
-        if message is not None:
+        if result is not None:
+            params["result"] = result
+        elif message is not None:
+            # Preserve the pre-10.0 compatibility shape while also emitting
+            # the current result field for upgraded callers and fixtures.
             params["message"] = message
+            params["result"] = message
+        params.update({k: v for k, v in extra.items() if v is not None})
         return await self._request("answerGuestQuery", **params)
 
     async def send_live_photo(
         self,
         chat_id: Union[int, str],
-        video: Optional[Any] = None,
-        thumbnail: Optional[Any] = None,
-        duration: Optional[int] = None,
-        width: Optional[int] = None,
-        height: Optional[int] = None,
+        live_photo: Optional[Any] = None,
+        photo: Optional[Any] = None,
         caption: Optional[str] = None,
-        caption_parse_mode: Optional[str] = None,
+        parse_mode: Optional[str] = None,
         caption_entities: Optional[List[Dict]] = None,
         show_caption_above_media: Optional[bool] = None,
         has_spoiler: Optional[bool] = None,
@@ -2088,30 +2202,46 @@ class TelegramAPI:
         reply_markup: Optional[Dict] = None,
         business_connection_id: Optional[str] = None,
         message_thread_id: Optional[int] = None,
+        direct_messages_topic_id: Optional[int] = None,
+        suggested_post_parameters: Optional[Dict] = None,
+        message_effect_id: Optional[str] = None,
+        allow_paid_broadcast: Optional[bool] = None,
+        receiver_user_id: Optional[int] = None,
+        callback_query_id: Optional[str] = None,
+        **legacy: Any,
     ):
+        """Send a live photo using the Bot API 10.2 request shape.
+
+        The old experimental ``video``/``thumbnail`` names are accepted as
+        aliases for ``live_photo``/``photo`` to avoid breaking callers.
         """
-        Send a Live Photo (video + auto-generated photo) — Bot API 10.0.
-        """
-        params: Dict[str, Any] = {"chat_id": chat_id}
-        if video is not None:
-            params["video"] = video
-        if thumbnail is not None:
-            params["thumbnail"] = thumbnail
-        for k, v in (
-            ("duration", duration), ("width", width), ("height", height),
-            ("caption", caption), ("caption_parse_mode", caption_parse_mode),
-            ("caption_entities", caption_entities),
-            ("show_caption_above_media", show_caption_above_media),
-            ("has_spoiler", has_spoiler),
-            ("disable_notification", disable_notification),
-            ("protect_content", protect_content),
-            ("reply_parameters", reply_parameters),
-            ("reply_markup", reply_markup),
-            ("business_connection_id", business_connection_id),
-            ("message_thread_id", message_thread_id),
-        ):
-            if v is not None:
-                params[k] = v
+        if live_photo is None:
+            live_photo = legacy.pop("video", None)
+        if photo is None:
+            photo = legacy.pop("thumbnail", None)
+        params: Dict[str, Any] = {
+            "chat_id": chat_id,
+            "live_photo": live_photo,
+            "photo": photo,
+            "caption": caption,
+            "parse_mode": parse_mode,
+            "caption_entities": caption_entities,
+            "show_caption_above_media": show_caption_above_media,
+            "has_spoiler": has_spoiler,
+            "disable_notification": disable_notification,
+            "protect_content": protect_content,
+            "reply_parameters": reply_parameters,
+            "reply_markup": reply_markup,
+            "business_connection_id": business_connection_id,
+            "message_thread_id": message_thread_id,
+            "direct_messages_topic_id": direct_messages_topic_id,
+            "suggested_post_parameters": suggested_post_parameters,
+            "message_effect_id": message_effect_id,
+            "allow_paid_broadcast": allow_paid_broadcast,
+            "receiver_user_id": receiver_user_id,
+            "callback_query_id": callback_query_id,
+        }
+        params.update({k: v for k, v in legacy.items() if v is not None})
         return await self._request("sendLivePhoto", **params)
 
     # ---------- Reactions & messages (Bot API 10.0) ----------
@@ -2120,11 +2250,16 @@ class TelegramAPI:
         self,
         chat_id: Union[int, str],
         message_id: Optional[int] = None,
+        user_id: Optional[int] = None,
+        actor_chat_id: Optional[int] = None,
+        **extra,
     ):
-        """Delete all reactions from a message (Bot API 10.0)."""
-        params: Dict[str, Any] = {"chat_id": chat_id}
-        if message_id is not None:
-            params["message_id"] = message_id
+        """Delete all reactions from a message."""
+        params: Dict[str, Any] = {
+            "chat_id": chat_id, "message_id": message_id,
+            "user_id": user_id, "actor_chat_id": actor_chat_id,
+        }
+        params.update({k: v for k, v in extra.items() if v is not None})
         return await self._request("deleteAllMessageReactions", **params)
 
     # ---------- Rich Messages & Ephemeral (Bot API 10.2) ----------
@@ -2170,6 +2305,7 @@ class TelegramAPI:
         chat_id: Union[int, str],
         message_thread_id: Optional[int] = None,
         rich_message: Optional[Dict] = None,
+        draft_id: Optional[int] = None,
         **extra: Any,
     ):
         """
@@ -2180,6 +2316,8 @@ class TelegramAPI:
             params["message_thread_id"] = message_thread_id
         if rich_message is not None:
             params["rich_message"] = rich_message
+        if draft_id is not None:
+            params["draft_id"] = draft_id
         params.update({k: v for k, v in extra.items() if v is not None})
         return await self._request("sendRichMessageDraft", **params)
 
@@ -2208,50 +2346,320 @@ class TelegramAPI:
 
     async def delete_ephemeral_message(
         self,
-        chat_id: Union[int, str],
-        message_id: int,
+        chat_id: Optional[Union[int, str]] = None,
+        message_id: Optional[int] = None,
+        ephemeral_message_id: Optional[int] = None,
+        receiver_user_id: Optional[int] = None,
+        **extra,
     ):
-        """
-        Delete a previously sent ephemeral message (Bot API 10.2).
-        """
-        return await self._request(
-            "deleteEphemeralMessage",
-            chat_id=chat_id,
-            message_id=message_id,
-        )
+        """Delete an ephemeral message using its current identifier."""
+        params = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "ephemeral_message_id": ephemeral_message_id,
+            "receiver_user_id": receiver_user_id,
+        }
+        params.update({k: v for k, v in extra.items() if v is not None})
+        return await self._request("deleteEphemeralMessage", **params)
 
     # ---------- Chat join requests & Mini Apps (Bot API 10.1) ----------
 
     async def answer_chat_join_request_query(
         self,
-        chat_id: Union[int, str],
-        user_id: int,
+        chat_join_request_query_id: Optional[str] = None,
+        result: Optional[Dict] = None,
+        chat_id: Optional[Union[int, str]] = None,
+        user_id: Optional[int] = None,
         message: Optional[Dict] = None,
         button_texts: Optional[Dict] = None,
         texts: Optional[Dict] = None,
+        **extra,
     ):
-        """
-        Answer a chat join request with an inline query
-        (Bot API 10.1, June 2026).
-        """
-        params: Dict[str, Any] = {"chat_id": chat_id, "user_id": user_id}
+        """Answer a chat-join-request query with an inline result."""
+        params: Dict[str, Any] = {
+            "chat_join_request_query_id": chat_join_request_query_id,
+            "result": result,
+        }
+        if chat_id is not None:
+            params["chat_id"] = chat_id
+        if user_id is not None:
+            params["user_id"] = user_id
         if message is not None:
-            params["message"] = message
+            params["result"] = message
         if button_texts is not None:
             params["button_texts"] = button_texts
         if texts is not None:
             params["texts"] = texts
+        params.update({k: v for k, v in extra.items() if v is not None})
         return await self._request("answerChatJoinRequestQuery", **params)
 
     async def send_chat_join_request_web_app(
         self,
-        chat_id: Union[int, str],
-        user_id: int,
+        chat_join_request_query_id: Optional[str] = None,
+        web_app_url: Optional[str] = None,
+        chat_id: Optional[Union[int, str]] = None,
+        user_id: Optional[int] = None,
         **extra: Any,
     ):
-        """
-        Send a chat join request Web App (Bot API 10.1).
-        """
-        params: Dict[str, Any] = {"chat_id": chat_id, "user_id": user_id}
+        """Send the Web App response for a chat-join-request query."""
+        params: Dict[str, Any] = {
+            "chat_join_request_query_id": chat_join_request_query_id,
+            "web_app_url": web_app_url,
+        }
+        if chat_id is not None:
+            params["chat_id"] = chat_id
+        if user_id is not None:
+            params["user_id"] = user_id
         params.update({k: v for k, v in extra.items() if v is not None})
         return await self._request("sendChatJoinRequestWebApp", **params)
+
+
+    # ---------- Bot API 9.6–10.2 endpoint completion ----------
+    async def approve_suggested_post(self, chat_id: Union[int, str], message_id: int,
+                                     send_date: Optional[int] = None):
+        return await self._request("approveSuggestedPost", chat_id=chat_id,
+                                   message_id=message_id, send_date=send_date)
+
+    async def decline_suggested_post(self, chat_id: Union[int, str], message_id: int,
+                                     comment: Optional[str] = None):
+        return await self._request("declineSuggestedPost", chat_id=chat_id,
+                                   message_id=message_id, comment=comment)
+
+    async def create_chat_subscription_invite_link(
+        self, chat_id: Union[int, str], subscription_period: int,
+        subscription_price: int, name: Optional[str] = None,
+    ):
+        return await self._request(
+            "createChatSubscriptionInviteLink", chat_id=chat_id,
+            name=name, subscription_period=subscription_period,
+            subscription_price=subscription_price,
+        )
+
+    async def edit_chat_subscription_invite_link(
+        self, chat_id: Union[int, str], invite_link: str,
+        name: Optional[str] = None,
+    ):
+        return await self._request(
+            "editChatSubscriptionInviteLink", chat_id=chat_id,
+            invite_link=invite_link, name=name,
+        )
+
+    async def ban_chat_sender_chat(self, chat_id: Union[int, str], sender_chat_id: int):
+        return await self._request("banChatSenderChat", chat_id=chat_id,
+                                   sender_chat_id=sender_chat_id)
+
+    async def unban_chat_sender_chat(self, chat_id: Union[int, str], sender_chat_id: int):
+        return await self._request("unbanChatSenderChat", chat_id=chat_id,
+                                   sender_chat_id=sender_chat_id)
+
+    async def delete_message_reaction(
+        self, chat_id: Union[int, str], message_id: int,
+        user_id: Optional[int] = None, actor_chat_id: Optional[int] = None,
+    ):
+        return await self._request(
+            "deleteMessageReaction", chat_id=chat_id, message_id=message_id,
+            user_id=user_id, actor_chat_id=actor_chat_id,
+        )
+
+    async def set_message_reaction(
+        self, chat_id: Union[int, str], message_id: int,
+        reaction: Optional[List[Dict]] = None, is_big: Optional[bool] = None,
+    ):
+        return await self._request(
+            "setMessageReaction", chat_id=chat_id, message_id=message_id,
+            reaction=reaction, is_big=is_big,
+        )
+
+    async def set_chat_member_tag(self, chat_id: Union[int, str], user_id: int,
+                                  tag: Optional[str] = None):
+        return await self._request("setChatMemberTag", chat_id=chat_id,
+                                   user_id=user_id, tag=tag)
+
+    async def send_chat_action(
+        self, chat_id: Union[int, str], action: str,
+        business_connection_id: Optional[str] = None,
+        message_thread_id: Optional[int] = None,
+    ):
+        return await self._request(
+            "sendChatAction", chat_id=chat_id, action=action,
+            business_connection_id=business_connection_id,
+            message_thread_id=message_thread_id,
+        )
+
+    async def send_message_draft(
+        self, chat_id: Union[int, str], draft_id: int, text: str,
+        parse_mode: Optional[str] = None, entities: Optional[List[Dict]] = None,
+        message_thread_id: Optional[int] = None,
+    ):
+        return await self._request(
+            "sendMessageDraft", chat_id=chat_id, draft_id=draft_id, text=text,
+            parse_mode=parse_mode, entities=entities,
+            message_thread_id=message_thread_id,
+        )
+
+    async def send_paid_media(
+        self, chat_id: Union[int, str], star_count: int, media: List[Dict],
+        payload: Optional[str] = None, caption: Optional[str] = None,
+        parse_mode: Optional[str] = None, caption_entities: Optional[List[Dict]] = None,
+        show_caption_above_media: Optional[bool] = None,
+        disable_notification: Optional[bool] = None,
+        protect_content: Optional[bool] = None,
+        reply_parameters: Optional[Dict] = None,
+        reply_markup: Optional[Dict] = None,
+        business_connection_id: Optional[str] = None,
+        message_thread_id: Optional[int] = None,
+        direct_messages_topic_id: Optional[int] = None,
+        suggested_post_parameters: Optional[Dict] = None,
+        allow_paid_broadcast: Optional[bool] = None,
+    ):
+        return await self._request(
+            "sendPaidMedia", chat_id=chat_id, star_count=star_count,
+            media=media, payload=payload, caption=caption, parse_mode=parse_mode,
+            caption_entities=caption_entities,
+            show_caption_above_media=show_caption_above_media,
+            disable_notification=disable_notification, protect_content=protect_content,
+            reply_parameters=reply_parameters, reply_markup=reply_markup,
+            business_connection_id=business_connection_id,
+            message_thread_id=message_thread_id,
+            direct_messages_topic_id=direct_messages_topic_id,
+            suggested_post_parameters=suggested_post_parameters,
+            allow_paid_broadcast=allow_paid_broadcast,
+        )
+
+    async def send_checklist(
+        self, chat_id: Union[int, str], checklist: Dict,
+        business_connection_id: Optional[str] = None,
+        disable_notification: Optional[bool] = None,
+        protect_content: Optional[bool] = None,
+        reply_parameters: Optional[Dict] = None,
+        reply_markup: Optional[Dict] = None,
+        message_effect_id: Optional[str] = None,
+    ):
+        return await self._request(
+            "sendChecklist", chat_id=chat_id, checklist=checklist,
+            business_connection_id=business_connection_id,
+            disable_notification=disable_notification,
+            protect_content=protect_content, reply_parameters=reply_parameters,
+            reply_markup=reply_markup, message_effect_id=message_effect_id,
+        )
+
+    async def edit_message_checklist(
+        self, chat_id: Union[int, str], message_id: int, checklist: Dict,
+        business_connection_id: Optional[str] = None,
+        reply_markup: Optional[Dict] = None,
+    ):
+        return await self._request(
+            "editMessageChecklist", chat_id=chat_id, message_id=message_id,
+            checklist=checklist, business_connection_id=business_connection_id,
+            reply_markup=reply_markup,
+        )
+
+    async def edit_ephemeral_message_text(
+        self, chat_id: Union[int, str], ephemeral_message_id: int, text: str,
+        receiver_user_id: Optional[int] = None, parse_mode: Optional[str] = None,
+        entities: Optional[List[Dict]] = None,
+        link_preview_options: Optional[Dict] = None,
+        reply_markup: Optional[Dict] = None,
+    ):
+        return await self._request(
+            "editEphemeralMessageText", chat_id=chat_id,
+            ephemeral_message_id=ephemeral_message_id, text=text,
+            receiver_user_id=receiver_user_id, parse_mode=parse_mode,
+            entities=entities, link_preview_options=link_preview_options,
+            reply_markup=reply_markup,
+        )
+
+    async def edit_ephemeral_message_media(
+        self, chat_id: Union[int, str], ephemeral_message_id: int, media: Dict,
+        receiver_user_id: Optional[int] = None, reply_markup: Optional[Dict] = None,
+    ):
+        return await self._request(
+            "editEphemeralMessageMedia", chat_id=chat_id,
+            ephemeral_message_id=ephemeral_message_id, media=media,
+            receiver_user_id=receiver_user_id, reply_markup=reply_markup,
+        )
+
+    async def edit_ephemeral_message_caption(
+        self, chat_id: Union[int, str], ephemeral_message_id: int,
+        caption: Optional[str] = None, receiver_user_id: Optional[int] = None,
+        parse_mode: Optional[str] = None,
+        caption_entities: Optional[List[Dict]] = None,
+        reply_markup: Optional[Dict] = None,
+    ):
+        return await self._request(
+            "editEphemeralMessageCaption", chat_id=chat_id,
+            ephemeral_message_id=ephemeral_message_id, caption=caption,
+            receiver_user_id=receiver_user_id, parse_mode=parse_mode,
+            caption_entities=caption_entities, reply_markup=reply_markup,
+        )
+
+    async def edit_ephemeral_message_reply_markup(
+        self, chat_id: Union[int, str], ephemeral_message_id: int,
+        receiver_user_id: Optional[int] = None,
+        reply_markup: Optional[Dict] = None,
+    ):
+        return await self._request(
+            "editEphemeralMessageReplyMarkup", chat_id=chat_id,
+            ephemeral_message_id=ephemeral_message_id,
+            receiver_user_id=receiver_user_id, reply_markup=reply_markup,
+        )
+
+    async def get_business_connection(self, business_connection_id: str):
+        return await self._request("getBusinessConnection",
+                                   business_connection_id=business_connection_id)
+
+    async def get_forum_topic_icon_stickers(
+        self, chat_id: Optional[Union[int, str]] = None,
+        name: Optional[str] = None, icon_color: Optional[int] = None,
+        icon_custom_emoji_id: Optional[str] = None,
+    ):
+        return await self._request(
+            "getForumTopicIconStickers", chat_id=chat_id, name=name,
+            icon_color=icon_color, icon_custom_emoji_id=icon_custom_emoji_id,
+        )
+
+    async def get_managed_bot_access_settings(self, user_id: int):
+        return await self._request("getManagedBotAccessSettings", user_id=user_id)
+
+    async def set_managed_bot_access_settings(
+        self, user_id: int, is_access_restricted: Optional[bool] = None,
+        added_user_ids: Optional[List[int]] = None,
+    ):
+        return await self._request(
+            "setManagedBotAccessSettings", user_id=user_id,
+            is_access_restricted=is_access_restricted,
+            added_user_ids=added_user_ids,
+        )
+
+    async def get_user_chat_boosts(self, chat_id: Union[int, str], user_id: int):
+        return await self._request("getUserChatBoosts", chat_id=chat_id, user_id=user_id)
+
+    async def get_user_personal_chat_messages(self, user_id: int, limit: Optional[int] = None):
+        return await self._request("getUserPersonalChatMessages", user_id=user_id, limit=limit)
+
+    async def get_user_profile_audios(
+        self, user_id: int, offset: Optional[int] = None, limit: Optional[int] = None,
+    ):
+        return await self._request(
+            "getUserProfileAudios", user_id=user_id, offset=offset, limit=limit
+        )
+
+    async def replace_sticker_in_set(
+        self, user_id: int, name: str, old_sticker: str, sticker: Dict,
+    ):
+        return await self._request(
+            "replaceStickerInSet", user_id=user_id, name=name,
+            old_sticker=old_sticker, sticker=sticker,
+        )
+
+    async def download_file(self, file_id: str) -> bytes:
+        """Download a file from Telegram's file endpoint."""
+        file_info = await self.get_file(file_id)
+        file_path = file_info.get("file_path") if isinstance(file_info, dict) else None
+        if not file_path:
+            raise TelegramError(description="getFile response did not contain file_path")
+        file_base_url = self.base_url.replace("/bot", "/file/bot", 1)
+        url = f"{file_base_url}/{file_path}"
+        response = await self.pool.get(url)
+        response.raise_for_status()
+        return response.content

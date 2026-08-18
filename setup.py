@@ -42,10 +42,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="swiftbot",
-    version="1.6.3",
+    version="1.6.4",
     author="Arjun-M",
     author_email="arjunm@atomicmail.io",
-    description="Async Telegram bot framework with typed decorators, composable filters, persistent FSM storage and a typed error hierarchy - Bot API 2026",
+    description="Async Telegram bot framework with typed decorators, composable filters, persistent FSM storage and a typed error hierarchy - Telegram Bot API 10.2",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/Arjun-M/SwiftBot",
