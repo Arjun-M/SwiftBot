@@ -1,0 +1,22 @@
+# Only the working codebase goes into the sdist. No docs, examples, tests,
+# banners, hidden/config files, or egg-info.
+include LICENSE
+include README.md
+include requirements.txt
+recursive-include swiftbot *.py
+prune docs
+prune examples
+prune tests
+prune .github
+prune .pytest_cache
+prune dist
+prune build
+prune swiftbot.egg-info
+global-exclude __pycache__
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude .DS_Store
+global-exclude *.log
+global-exclude .env*
+global-exclude *.pem
+global-exclude *.key
